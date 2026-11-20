@@ -58,7 +58,10 @@ Not part of this MVP: RSL login/RBAC, multiple users, live RSL/Lekuka connectors
 - Workbook guide sheet states source, privacy, validation and scoring limits; TIN columns are formatted as text to preserve leading zeroes.
 - Header aliases for common TIN, taxpayer, invoice and amount labels.
 - Import source, row and coverage counts.
+- Cross-tax evidence review worksheets for ePayments VAT lines, e-Certificates, contract terms, profit sharing, withholding tax and payroll benefits.
 - Cross-import duplicate reconciliation, editable mapping/correction workflow and source-version history remain future work.
+
+The cross-tax evidence review is a workbook-based prototype only. It highlights missing or unconfirmed ePayments attachments, links certificate and withholding records by certificate reference, compares contract rates only where contract references and effective periods match unambiguously, and displays profit-share and expatriate benefit context. Contract terms and clause references are manually supplied and require officer validation; no AI extraction or live ePayments/e-Certificates/WHT integration is implemented. These comparisons do not affect R1–R5 scores or determine tax treatment.
 
 ### 2. Taxpayer profile
 
@@ -150,6 +153,7 @@ Implemented in the current workspace:
 - Local SQLite storage for imports, source rows, R1–R5 scores and prototype case notes/status.
 - Per-taxpayer R1–R5 scoring from imported VAT, purchase invoice, merchant statement, credit note and trade worksheets.
 - A visible warning that proposal-only MNE rules are not scored by the current engine.
+- A cross-tax evidence review for attachment completeness, certificate/WHT references, period-matched contractual rates, profit-sharing records and salary/benefit review indicators. Workbook-only and advisory.
 - Server-only Next.js adapter for the Python `/health` and `/score` endpoints.
 - Request/response validation and typed Python API contracts.
 - R1–R5 scoring, confidence, priority and evidence; R3 uses merchant statements only.

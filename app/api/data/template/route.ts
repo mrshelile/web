@@ -35,6 +35,8 @@ export async function GET(): Promise<NextResponse> {
     ["Enter TIN values as text to preserve leading zeroes. Keep the same TIN spelling in every worksheet."],
     ["Use one row per taxpayer, VAT period or source transaction, as appropriate. Leave unknown values blank; do not estimate or invent them."],
     ["Amount fields must be numeric. Boolean fields accept Yes/No, True/False or 1/0."],
+    ["Contract rates are percentages (enter 15 for 15%); extraction_confidence is a 0–1 value. Use ISO dates for effective_from and effective_to."],
+    ["For ePayments, attachment_status should be attached, missing or unknown. A document reference should identify the supporting file in an approved system."],
     ["Current Python screening is R1–R5 only. Corporate-tax, WHT, customs, payroll and imported-services sheets are stored for review but are not scored."],
     ["Cross-tax evidence sheets are imported as review context only. Contract rates and clauses must be human-verified; no AI extraction or external RSL integration is performed."],
     ["Do not upload bank transactions or M-Pesa statements."],

@@ -117,6 +117,10 @@ function sourceLabel(key: string): string {
     foreign_services: "Foreign services",
     payroll: "Payroll",
     related_parties: "Related parties",
+    e_payments: "ePayments VAT lines",
+    e_certificates: "e-Certificates",
+    contract_terms: "Contract terms",
+    profit_sharing: "Profit sharing",
   }
   return labels[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
 }
@@ -1117,6 +1121,28 @@ function formatConfidence(value: number | null): string {
   return value === null ? "not provided" : `${Math.round(value * 100)}%`
 }
 
+function contractCoversPeriod(
+  effectiveFrom: string,
+  effectiveTo: string,
+  period: string,
+): boolean {
+  if (!effectiveFrom || !effectiveTo || !period) return false
+  const normalizedPeriod = period.trim()
+  const start = /^\d{4}-\d{2}$/.test(normalizedPeriod)
+    ? `${normalizedPeriod}-01`
+    : normalizedPeriod
+  const end = /^\d{4}-\d{2}$/.test(normalizedPeriod)
+    ? `${normalizedPeriod}-31`
+    : normalizedPeriod
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom)
+    || !/^\d{4}-\d{2}-\d{2}$/.test(effectiveTo)
+    || !/^\d{4}-\d{2}-\d{2}$/.test(start)
+    || !/^\d{4}-\d{2}-\d{2}$/.test(end)
+  ) return false
+  return effectiveFrom <= end && effectiveTo >= start
+}
+
 function CrossTaxEvidenceScreen({
   taxpayers,
   search,
@@ -1203,6 +1229,13 @@ function CrossTaxEvidenceScreen({
                             (record) => record.certificateReference === certificate.reference,
                           )
                         : []
+                      const contractMatches = certificate.contractReference
+                        ? taxpayer.contractTerms.filter(
+                            (term) =>
+                              term.reference === certificate.contractReference
+                              && contractCoversPeriod(term.effectiveFrom, term.effectiveTo, certificate.period),
+                          )
+                        : []
                       const whtTotal = linkedWht.reduce(
                         (sum, record) => sum + (record.withholdingAmount ?? 0),
                         0,
@@ -1222,6 +1255,13 @@ function CrossTaxEvidenceScreen({
                               ? ` · amount difference ${formatNumber(certificate.claimedAmount - whtTotal)} (verify treatment and timing)`
                               : ""}
                           </small>
+                          <small>
+                            Contract match: {contractMatches.length === 1
+                              ? "one reference and period match"
+                              : contractMatches.length > 1
+                                ? "ambiguous reference and period matches"
+                                : "no validated reference and period match"}
+                          </small>
                         </div>
                       )
                     })}
@@ -1235,7 +1275,9 @@ function CrossTaxEvidenceScreen({
                   <div className="cross-tax-records">
                     {taxpayer.contractTerms.map((term, index) => {
                       const matchingCertificates = taxpayer.certificates.filter(
-                        (certificate) => certificate.contractReference === term.reference,
+                        (certificate) =>
+                          certificate.contractReference === term.reference
+                          && contractCoversPeriod(term.effectiveFrom, term.effectiveTo, certificate.period),
                       )
                       return (
                         <div className="cross-tax-record" key={`${term.reference}-${index}`}>
@@ -1244,19 +1286,29 @@ function CrossTaxEvidenceScreen({
                             <span>Effective {term.effectiveFrom || "date not provided"} to {term.effectiveTo || "date not provided"}</span>
                           </div>
                           <small>
-                            Contract rate {formatRate(term.contractualRate)} · clause {term.clauseReference ?? "not cited"} · extraction confidence {formatConfidence(term.extractionConfidence)}
+                            Contract rate {formatRate(term.contractualRate)} · clause {term.clauseReference ?? "not cited"} · extraction confidence {formatConfidence(term.extractionConfidence)} · validation {term.validationStatus || "not recorded"}
                           </small>
-                          <small>Validation status: {term.validationStatus || "not recorded"} · matching certificate(s): {matchingCertificates.length}</small>
+                          <small>Matching certificate(s) by reference and effective period: {matchingCertificates.length}</small>
                           {matchingCertificates.map((certificate) => (
-                            <small key={`${term.reference}-${certificate.reference}`}>
-                              Certificate {certificate.reference}: claimed {formatRate(certificate.claimedRate)}
-                              {term.contractualRate !== null && certificate.claimedRate !== null
-                                ? ` · variance ${(certificate.claimedRate - term.contractualRate).toFixed(2)} percentage points`
-                                : " · rate variance not evaluable"}
-                              {term.taxBase !== null && certificate.taxBase !== null && term.taxBase !== certificate.taxBase
-                                ? " · tax bases differ; verify before comparison"
-                                : ""}
-                            </small>
+                            (() => {
+                              const applicableTerms = taxpayer.contractTerms.filter(
+                                (candidate) =>
+                                  candidate.reference === certificate.contractReference
+                                  && contractCoversPeriod(candidate.effectiveFrom, candidate.effectiveTo, certificate.period),
+                              )
+                              const uniqueMatch = applicableTerms.length === 1 && applicableTerms[0] === term
+                              return (
+                                <small key={`${term.reference}-${certificate.reference}`}>
+                                  Certificate {certificate.reference}: claimed {formatRate(certificate.claimedRate)}
+                                  {uniqueMatch && term.contractualRate !== null && certificate.claimedRate !== null
+                                    ? ` · variance ${(certificate.claimedRate - term.contractualRate).toFixed(2)} percentage points`
+                                    : " · contract match ambiguous or rate variance not evaluable"}
+                                  {term.taxBase !== null && certificate.taxBase !== null && term.taxBase !== certificate.taxBase
+                                    ? " · tax bases differ; verify before comparison"
+                                    : ""}
+                                </small>
+                              )
+                            })()
                           ))}
                         </div>
                       )
