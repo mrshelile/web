@@ -6,6 +6,7 @@ import type { ParsedWorkbook, WorkbookRecord, WorkbookSheet } from "./types"
 const MAX_SHEETS = 20
 const MAX_ROWS_PER_SHEET = 10_000
 const MAX_RECORDS = 20_000
+const excludedBankSourceToken = /(^|_)(bank|banking|mpesa|m_pesa|mobile_money|mobilemoney)(_|$)/
 
 const sheetAliases: Record<string, string> = {
   company: "taxpayers",
@@ -241,6 +242,11 @@ function parseSheet(sheet: ExcelJS.Worksheet): WorkbookSheet | null {
   const name = sheet.name
   const key = normalizeSheet(name)
   if (["read_me", "readme", "instructions", "guide"].includes(key)) return null
+  if (excludedBankSourceToken.test(key)) {
+    throw new WorkbookValidationError(
+      `${name}: bank and M-Pesa transaction data are not accepted. Remove this worksheet before uploading.`,
+    )
+  }
   const headerRow = sheet.getRow(1)
   const headers: Array<{ column: number; key: string }> = []
 
@@ -249,6 +255,11 @@ function parseSheet(sheet: ExcelJS.Worksheet): WorkbookSheet | null {
     if (raw === null || raw === "") continue
     const header = normalizeHeader(String(raw))
     if (!header) continue
+    if (excludedBankSourceToken.test(header)) {
+      throw new WorkbookValidationError(
+        `${name}: bank and M-Pesa transaction fields are not accepted. Remove this column before uploading.`,
+      )
+    }
     if (headers.some((item) => item.key === header)) {
       throw new WorkbookValidationError(`${name}: column headings must be unique after normalization ("${header}").`)
     }

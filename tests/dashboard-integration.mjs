@@ -137,6 +137,46 @@ legacyForm.set("file", new Blob(["not an xlsx"]), "legacy.xls")
 const legacyUpload = await fetch(`${baseUrl}/api/data/imports`, { method: "POST", body: legacyForm })
 assert.equal(legacyUpload.status, 400, "legacy .xls files should receive a clear validation error")
 
+for (const sheetName of ["Bank Transactions", "M-Pesa Statements"]) {
+  const excludedSourceWorkbook = new ExcelJS.Workbook()
+  const excludedSourceSheet = excludedSourceWorkbook.addWorksheet(sheetName)
+  excludedSourceSheet.addRow(["tin", "amount"])
+  excludedSourceSheet.addRow(["SYNTH-EXCLUDED-01", 100])
+  const excludedSourceForm = new FormData()
+  excludedSourceForm.set(
+    "file",
+    new Blob([await excludedSourceWorkbook.xlsx.writeBuffer()], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }),
+    "excluded-financial-source.xlsx",
+  )
+  const excludedSourceUpload = await fetch(`${baseUrl}/api/data/imports`, {
+    method: "POST",
+    body: excludedSourceForm,
+  })
+  assert.equal(excludedSourceUpload.status, 400, `${sheetName} worksheets should be rejected`)
+  assert.match((await excludedSourceUpload.json()).error, /bank and M-Pesa transaction data are not accepted/i)
+}
+
+const excludedColumnWorkbook = new ExcelJS.Workbook()
+const excludedColumnSheet = excludedColumnWorkbook.addWorksheet("Evidence")
+excludedColumnSheet.addRow(["tin", "mpesa_reference"])
+excludedColumnSheet.addRow(["SYNTH-EXCLUDED-02", "SYN-REF-01"])
+const excludedColumnForm = new FormData()
+excludedColumnForm.set(
+  "file",
+  new Blob([await excludedColumnWorkbook.xlsx.writeBuffer()], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  }),
+  "excluded-financial-column.xlsx",
+)
+const excludedColumnUpload = await fetch(`${baseUrl}/api/data/imports`, {
+  method: "POST",
+  body: excludedColumnForm,
+})
+assert.equal(excludedColumnUpload.status, 400, "bank/M-Pesa source columns should be rejected")
+assert.match((await excludedColumnUpload.json()).error, /bank and M-Pesa transaction fields are not accepted/i)
+
 const formulaWorkbook = new ExcelJS.Workbook()
 const formulaTaxpayers = formulaWorkbook.addWorksheet("Taxpayers")
 formulaTaxpayers.addRow(["tin", "name", "revenue"])
