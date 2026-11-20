@@ -1,0 +1,78 @@
+{
+  "tin": "480319284",
+  "name": "Demo Wholesale",
+  "vat_returns": [
+    {
+      "period": "2026-01",
+      "input_vat": 100000,
+      "output_vat": 20000,
+      "net_vat": -80000,
+      "declared_turnover": 150000
+    },
+    {
+      "period": "2026-02",
+      "input_vat": 100000,
+      "output_vat": 20000,
+      "net_vat": -80000,
+      "declared_turnover": 150000
+    },
+    {
+      "period": "2026-03",
+      "input_vat": 100000,
+      "output_vat": 20000,
+      "net_vat": -80000,
+      "declared_turnover": 150000
+    },
+    {
+      "period": "2026-04",
+      "input_vat": 100000,
+      "output_vat": 20000,
+      "net_vat": -80000,
+      "declared_turnover": 150000
+    },
+    {
+      "period": "2026-05",
+      "input_vat": 100000,
+      "output_vat": 20000,
+      "net_vat": -80000,
+      "declared_turnover": 150000
+    }
+  ],
+  "lekuka_invoices": [
+    {
+      "invoice_id": "I1",
+      "supplier_tin": "X",
+      "vat_amount": 150000,
+      "matched": true
+    },
+    {
+      "invoice_id": "I2",
+      "supplier_tin": "Y",
+      "vat_amount": 100000,
+      "matched": false
+    }
+  ],
+  "bank_transactions": [
+    {
+      "credit": 1500000
+    }
+  ],
+  "credit_notes": [
+    {
+      "note_id": "C1",
+      "amount": 90000
+    }
+  ],
+  "trades": [
+    {
+      "counterparty_tin": "Z",
+      "amount": 600000,
+      "related": true
+    },
+    {
+      "counterparty_tin": "W",
+      "amount": 100000,
+      "related": false
+    }
+  ]
+}
