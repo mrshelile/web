@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import ExcelJS from "exceljs"
 
-const baseUrl = process.env.RISKLENS_WEB_URL ?? "http://localhost:3000"
+const baseUrl = process.env.RISKLENS_WEB_URL ?? "https://engine.fastapicloud.dev"
 const workbook = new ExcelJS.Workbook()
 const guide = workbook.addWorksheet("Read Me")
 guide.addRow(["RiskLens Excel import guide"])

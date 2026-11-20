@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 
-const baseUrl = process.env.RISKLENS_WEB_URL ?? "http://localhost:3000"
+const baseUrl = process.env.RISKLENS_WEB_URL ?? "https://engine.fastapicloud.dev/"
 const profilePath = new URL("../sample_profile.json", import.meta.url)
 const profile = JSON.parse(await readFile(profilePath, "utf8"))
 

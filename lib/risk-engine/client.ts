@@ -4,7 +4,7 @@ import { RiskEngineError } from "./errors"
 import { parseEngineHealth, parseScoreResult } from "./schemas"
 import type { EngineHealth, ScoreResult, TaxpayerProfile } from "./types"
 
-const DEFAULT_ENGINE_URL = "http://localhost:8000"
+const DEFAULT_ENGINE_URL = "https://engine.fastapicloud.dev"
 const HEALTH_TIMEOUT_MS = 5_000
 const SCORE_TIMEOUT_MS = 15_000
 
