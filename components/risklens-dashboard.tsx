@@ -74,11 +74,12 @@ function errorMessage(payload: unknown, fallback: string): string {
 
 async function readJsonResponse(response: Response, fallback: string): Promise<unknown> {
   const text = await response.text()
+  const endpoint = response.url ? new URL(response.url).pathname : "request"
   if (!text.trim()) {
     throw new Error(
       response.ok
         ? fallback
-        : `Request failed with HTTP ${response.status} and an empty response.`,
+        : `${endpoint} failed with HTTP ${response.status} and an empty response.`,
     )
   }
   try {
@@ -87,7 +88,7 @@ async function readJsonResponse(response: Response, fallback: string): Promise<u
     throw new Error(
       response.ok
         ? fallback
-        : `Request failed with HTTP ${response.status}; the response was not valid JSON.`,
+        : `${endpoint} failed with HTTP ${response.status}; the response was not valid JSON.`,
     )
   }
 }
@@ -156,24 +157,15 @@ export default function RiskLensDashboard() {
 
   useEffect(() => {
     let active = true
-    Promise.all([
-      fetch("/api/data/dashboard", { cache: "no-store" }).then(async (response) => {
+    fetch("/api/data/dashboard", { cache: "no-store" })
+      .then(async (response) => {
         const payload = await readJsonResponse(response, "Unable to load dashboard data.")
         if (!response.ok) throw new Error(errorMessage(payload, "Unable to load dashboard data."))
         return payload as DashboardData
-      }),
-      fetch("/api/risk/health", { cache: "no-store" })
-        .then(async (response) =>
-          response.ok
-            ? ((await readJsonResponse(response, "Unable to load engine health.")) as EngineHealth)
-            : null,
-        )
-        .catch(() => null),
-    ])
-      .then(([nextDashboard, engineHealth]) => {
+      })
+      .then((nextDashboard) => {
         if (!active) return
         setDashboard(nextDashboard)
-        setHealth(engineHealth)
         setCaseCountOverride(nextDashboard.summary.highPriority)
       })
       .catch((error: unknown) => {
@@ -182,6 +174,20 @@ export default function RiskLensDashboard() {
       .finally(() => {
         if (active) setLoading(false)
       })
+
+    fetch("/api/risk/health", { cache: "no-store" })
+      .then(async (response) =>
+        response.ok
+          ? ((await readJsonResponse(response, "Unable to load engine health.")) as EngineHealth)
+          : null,
+      )
+      .then((engineHealth) => {
+        if (active) setHealth(engineHealth)
+      })
+      .catch(() => {
+        if (active) setHealth(null)
+      })
+
     return () => {
       active = false
     }
