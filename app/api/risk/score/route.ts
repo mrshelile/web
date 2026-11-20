@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { internalApiError } from "@/lib/api/errors"
 import { RiskEngineError, ProfileValidationError, publicEngineError } from "@/lib/risk-engine/errors"
 import { scoreProfile } from "@/lib/risk-engine/client"
 import { parseTaxpayerProfile } from "@/lib/risk-engine/schemas"
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         { status: 400 },
       )
     }
-    throw error
+    return internalApiError(error, "POST", "/api/risk/score")
   }
 
   let profile
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         { status: 400 },
       )
     }
-    throw error
+    return internalApiError(error, "POST", "/api/risk/score")
   }
 
   try {
@@ -37,6 +38,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       const result = publicEngineError(error)
       return NextResponse.json(result.body, { status: result.status })
     }
-    throw error
+    return internalApiError(error, "POST", "/api/risk/score")
   }
 }
