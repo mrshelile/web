@@ -6,6 +6,15 @@ import type { CaseStatus, DashboardData, TaxpayerDashboardRow } from "@/lib/data
 type DashboardTab = "overview" | "worklist" | "refunds" | "mne" | "evidence" | "recovery" | "imports"
 type EngineHealth = { ok: boolean; rule_version: string }
 type Scenario = { name: string; adjustment: number; auditSuccess: number; collectionRate: number }
+type BatchScoreSummary = {
+  total: number
+  scored: number
+  flagged: number
+  highPriority: number
+  notEvaluable: number
+  failed: number
+  errorMessage?: string
+}
 
 const navigation: Array<{ id: DashboardTab; label: string; marker: string }> = [
   { id: "overview", label: "Overview", marker: "OV" },
@@ -135,6 +144,7 @@ export default function RiskLensDashboard() {
   const [healthError, setHealthError] = useState("")
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [bulkScoring, setBulkScoring] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [busyTin, setBusyTin] = useState<string | null>(null)
   const [expandedTin, setExpandedTin] = useState<string | null>(null)
@@ -222,7 +232,7 @@ export default function RiskLensDashboard() {
   const taxpayers = dashboard?.taxpayers ?? emptyTaxpayers
   const visibleTaxpayers = useMemo(() => {
     const term = search.trim().toLowerCase()
-    return taxpayers.filter((taxpayer) => {
+    const filtered = taxpayers.filter((taxpayer) => {
       if (tab === "refunds" && taxpayer.refundClaimed <= 0) return false
       if (
         tab === "mne"
@@ -244,9 +254,14 @@ export default function RiskLensDashboard() {
         && taxpayer.profitSharingRecords.length === 0
         && taxpayer.payrollBenefitRecords.length === 0
       ) return false
-      if (tab === "worklist" && taxpayer.scoreStatus === "not_evaluable") return false
       return !term || taxpayer.name.toLowerCase().includes(term) || taxpayer.tin.toLowerCase().includes(term)
     })
+    return tab === "worklist"
+      ? filtered.sort((left, right) =>
+          (right.score?.risk_score ?? -1) - (left.score?.risk_score ?? -1)
+          || left.name.localeCompare(right.name),
+        )
+      : filtered
   }, [search, tab, taxpayers])
 
   async function handleUpload(event: FormEvent<HTMLFormElement>) {
@@ -320,6 +335,37 @@ export default function RiskLensDashboard() {
       }
     } finally {
       setBusyTin(null)
+    }
+  }
+
+  async function runScoreAll() {
+    if (!dashboard?.activeImportId) return
+    const importId = dashboard.activeImportId
+    setBulkScoring(true)
+    setPageError("")
+    setNotice("")
+    try {
+      const response = await fetch(`/api/data/imports/${encodeURIComponent(importId)}/score-all`, {
+        method: "POST",
+      })
+      const payload = await readJsonResponse(response, "Bulk risk screening failed.")
+      if (!response.ok) throw new Error(errorMessage(payload, "Bulk risk screening failed."))
+      const result = payload as BatchScoreSummary
+      const next = await loadDashboard(importId)
+      setCaseCountOverride(next.summary.highPriority)
+      const details = result.errorMessage ? ` Engine message: ${result.errorMessage}` : ""
+      setNotice(
+        `Screening complete for ${formatNumber(result.total)} taxpayers: ${formatNumber(result.scored)} scored, ${formatNumber(result.highPriority)} high priority, ${formatNumber(result.flagged)} with triggered rules, ${formatNumber(result.notEvaluable)} not evaluable, and ${formatNumber(result.failed)} errors. Expand each taxpayer row for rule reasons and source evidence.${details}`,
+      )
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : "Bulk risk screening failed.")
+      try {
+        await loadDashboard(importId)
+      } catch {
+        setPageError("Bulk screening failed, and the dashboard could not refresh. Reload the page to retry.")
+      }
+    } finally {
+      setBulkScoring(false)
     }
   }
 
@@ -474,7 +520,9 @@ export default function RiskLensDashboard() {
                   health={health}
                   onOpenWorklist={() => setTab("worklist")}
                   onScore={runScore}
+                  onScoreAll={runScoreAll}
                   busyTin={busyTin}
+                  bulkScoring={bulkScoring}
                   expandedTin={expandedTin}
                   onToggleTin={(tin) => setExpandedTin(expandedTin === tin ? null : tin)}
                   onSaveCase={saveCase}
@@ -489,9 +537,21 @@ export default function RiskLensDashboard() {
                       <p>
                         {tab === "refunds"
                           ? "Refund amounts come from the workbook. R1–R5 does not decide refund eligibility."
-                          : "Score records individually and review the engine evidence before making a decision."}
+                          : "Screen the full import at once, then expand any taxpayer to review rule reasons and source evidence."}
                       </p>
                     </div>
+                    {tab === "worklist" ? (
+                      <button
+                        className="button button-primary button-small"
+                        disabled={!health?.ok || bulkScoring || busyTin !== null || !dashboard.activeImportId || dashboard.summary.taxpayers === 0}
+                        onClick={() => void runScoreAll()}
+                        type="button"
+                      >
+                        {bulkScoring
+                          ? "Scoring all taxpayers…"
+                          : `Run R1–R5 for all ${formatNumber(dashboard.summary.taxpayers)}`}
+                      </button>
+                    ) : null}
                     <div className="table-search">
                       <span aria-hidden="true">⌕</span>
                       <input
@@ -507,6 +567,7 @@ export default function RiskLensDashboard() {
                     importId={dashboard.activeImportId}
                     engineOnline={Boolean(health?.ok)}
                     busyTin={busyTin}
+                    bulkScoring={bulkScoring}
                     expandedTin={expandedTin}
                     onScore={runScore}
                     onToggleTin={(tin) => setExpandedTin(expandedTin === tin ? null : tin)}
@@ -617,7 +678,9 @@ function Overview({
   health,
   onOpenWorklist,
   onScore,
+  onScoreAll,
   busyTin,
+  bulkScoring,
   expandedTin,
   onToggleTin,
   onSaveCase,
@@ -626,7 +689,9 @@ function Overview({
   health: EngineHealth | null
   onOpenWorklist: () => void
   onScore: (tin: string) => void
+  onScoreAll: () => void
   busyTin: string | null
+  bulkScoring: boolean
   expandedTin: string | null
   onToggleTin: (tin: string) => void
   onSaveCase: (
@@ -705,14 +770,25 @@ function Overview({
 
       <section className="panel queue-panel">
         <div className="panel-heading panel-heading-wrap">
-          <div><div className="section-kicker">REVIEW REQUIRED</div><h2>Priority taxpayer queue</h2><p>Results are advisory. Verify evidence and consider lawful explanations.</p></div>
-          <button className="button button-outline button-small" onClick={onOpenWorklist} type="button">View all records <span>→</span></button>
+          <div><div className="section-kicker">REVIEW REQUIRED</div><h2>Priority taxpayer queue</h2><p>Expand a taxpayer to inspect triggered rules, reasons, confidence notes and supporting evidence.</p></div>
+          <div className="button-group">
+            <button
+              className="button button-primary button-small"
+              disabled={!health?.ok || bulkScoring || busyTin !== null || !dashboard.activeImportId || dashboard.summary.taxpayers === 0}
+              onClick={onScoreAll}
+              type="button"
+            >
+              {bulkScoring ? "Scoring all taxpayers…" : `Run R1–R5 for all ${formatNumber(dashboard.summary.taxpayers)}`}
+            </button>
+            <button className="button button-outline button-small" onClick={onOpenWorklist} type="button">View all records <span>→</span></button>
+          </div>
         </div>
         <TaxpayerTable
           rows={dashboard.taxpayers.slice(0, 5)}
           importId={dashboard.activeImportId}
           engineOnline={Boolean(health?.ok)}
           busyTin={busyTin}
+          bulkScoring={bulkScoring}
           expandedTin={expandedTin}
           onScore={onScore}
           onToggleTin={onToggleTin}
@@ -739,6 +815,7 @@ function TaxpayerTable({
   importId,
   engineOnline,
   busyTin,
+  bulkScoring,
   expandedTin,
   onScore,
   onToggleTin,
@@ -750,6 +827,7 @@ function TaxpayerTable({
   importId: string | null
   engineOnline: boolean
   busyTin: string | null
+  bulkScoring: boolean
   expandedTin: string | null
   onScore: (tin: string) => void
   onToggleTin: (tin: string) => void
@@ -795,6 +873,7 @@ function TaxpayerTable({
               importId={importId}
               engineOnline={engineOnline}
               busy={busyTin === taxpayer.tin}
+              bulkScoring={bulkScoring}
               expanded={expandedTin === taxpayer.tin}
               onScore={() => onScore(taxpayer.tin)}
               onToggle={() => onToggleTin(taxpayer.tin)}
@@ -824,6 +903,7 @@ function TableRows({
   importId,
   engineOnline,
   busy,
+  bulkScoring,
   expanded,
   onScore,
   onToggle,
@@ -835,6 +915,7 @@ function TableRows({
   importId: string | null
   engineOnline: boolean
   busy: boolean
+  bulkScoring: boolean
   expanded: boolean
   onScore: () => void
   onToggle: () => void
@@ -888,8 +969,8 @@ function TableRows({
         <td><span className={`case-status case-${taxpayer.caseStatus.toLowerCase().replace(/[^a-z]+/g, "-")}`}>{taxpayer.caseStatus}</span></td>
         <td className="row-action-cell">
           {mode === "worklist" && !score && canScore ? (
-            <button className="score-button" disabled={!engineOnline || busy} onClick={onScore} type="button">
-              {busy ? "Scoring…" : "Run R1–R5"}
+            <button className="score-button" disabled={!engineOnline || busy || bulkScoring} onClick={onScore} type="button">
+              {bulkScoring ? "Batch scoring…" : busy ? "Scoring…" : "Run R1–R5"}
             </button>
           ) : (
             <button className="row-open" aria-label={`Open ${taxpayer.name}`} onClick={onToggle} type="button">↗</button>
@@ -904,8 +985,8 @@ function TableRows({
                 <div className="detail-heading">
                   <div><div className="section-kicker">TAXPAYER REVIEW · {taxpayer.taxYear || "PERIOD NOT PROVIDED"}</div><h3>{taxpayer.name}</h3><span>TIN {taxpayer.tin}</span></div>
                   {mode === "worklist" && !score && canScore ? (
-                    <button className="button button-primary button-small" disabled={!engineOnline || busy} onClick={onScore} type="button">
-                      {busy ? "Scoring…" : "Run R1–R5 screening"}
+                    <button className="button button-primary button-small" disabled={!engineOnline || busy || bulkScoring} onClick={onScore} type="button">
+                      {bulkScoring ? "Batch scoring…" : busy ? "Scoring…" : "Run R1–R5 screening"}
                     </button>
                   ) : null}
                 </div>
@@ -929,7 +1010,14 @@ function TableRows({
                       <div className="evidence-list">
                         {score.flags.map((flag) => (
                           <article className="evidence-card" key={flag.rule_id}>
-                            <div><span className="flag-id">{flag.rule_id}</span><strong>{flag.name}</strong><span className="flag-exposure">{formatNumber(flag.exposure)} indicative</span></div>
+                            <div>
+                              <span className="flag-id">{flag.rule_id}</span>
+                              <strong>{flag.name}</strong>
+                              <span className={`evidence-tag ${flag.triggered ? "evidence-tag-review" : "evidence-tag-complete"}`}>
+                                {flag.triggered ? "Triggered · verify" : "Not triggered"}
+                              </span>
+                              <span className="flag-exposure">{formatNumber(flag.exposure)} indicative</span>
+                            </div>
                             <p>{flag.summary}</p>
                             {flag.evidence.map((evidence) => (
                               <small key={`${evidence.source}-${evidence.record_ref}`}>

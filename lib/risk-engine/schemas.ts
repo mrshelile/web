@@ -261,6 +261,26 @@ export function parseScoreResult(input: unknown): ScoreResult {
   }
 }
 
+export type BatchScoreOutcome = { tin: string; score: ScoreResult | null; error: string | null }
+
+export function parseScoreResults(input: unknown): BatchScoreOutcome[] {
+  if (!Array.isArray(input)) {
+    throw new RiskEngineError("ENGINE_INVALID_RESPONSE", "Risk engine returned an invalid batch response")
+  }
+  return input.map((item, index) => {
+    const path = `batch[${index}]`
+    const result = expectRecord(item, path, RiskEngineError)
+    allowKeys(result, ["tin", "score", "error"], path, RiskEngineError)
+    const tin = readString(result.tin, `${path}.tin`, RiskEngineError)
+    const error = readString(result.error, `${path}.error`, RiskEngineError, true)
+    const score = result.score === null ? null : parseScoreResult(result.score)
+    if ((score === null) === (error === null)) {
+      fail(RiskEngineError, path, "must contain exactly one of score or error")
+    }
+    return { tin, score, error }
+  })
+}
+
 export function parseEngineHealth(input: unknown): EngineHealth {
   const result = expectRecord(input, "health", RiskEngineError)
   allowKeys(result, ["ok", "rule_version"], "health", RiskEngineError)

@@ -3,6 +3,7 @@ import { internalApiError } from "@/lib/api/errors"
 import { getTaxpayerProfile, saveNotEvaluable, saveRiskScore, saveRiskScoreError } from "@/lib/data/database"
 import { RiskEngineError, publicEngineError } from "@/lib/risk-engine/errors"
 import { scoreProfile } from "@/lib/risk-engine/client"
+import { hasRiskEngineRecords } from "@/lib/risk-engine/profile"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -27,13 +28,7 @@ export async function POST(request: NextRequest, context: RouteContext): Promise
       return NextResponse.json({ error: "Taxpayer was not found in this import." }, { status: 404 })
     }
 
-    const hasEngineData =
-      profile.vat_returns.length > 0 ||
-      profile.lekuka_purchase_invoices.length > 0 ||
-      profile.merchant_statements.length > 0 ||
-      profile.lekuka_credit_notes.length > 0 ||
-      profile.trades.length > 0
-    if (!hasEngineData) {
+    if (!hasRiskEngineRecords(profile)) {
       saveNotEvaluable(importId, tin)
       return NextResponse.json(
         { error: "No VAT, Lekuka, merchant-statement or trade records are available for R1–R5 screening." },

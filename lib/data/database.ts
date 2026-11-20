@@ -272,6 +272,50 @@ export function getTaxpayerProfile(importId: string, tin: string): TaxpayerProfi
   }
 }
 
+export function listImportedTaxpayerTins(importId: string): string[] {
+  return database()
+    .prepare(
+      `SELECT DISTINCT tin FROM source_records
+       WHERE import_id = ? AND tin IS NOT NULL AND trim(tin) <> ''
+       ORDER BY tin`,
+    )
+    .all(importId)
+    .map((row) => text(row.tin))
+}
+
+export type RiskScoreUpdate =
+  | { tin: string; status: "scored"; score: ScoreResult }
+  | { tin: string; status: "error" | "not_evaluable"; errorMessage: string }
+
+export function saveRiskScoreUpdates(importId: string, updates: readonly RiskScoreUpdate[]): void {
+  if (updates.length === 0) return
+
+  const db = database()
+  const updatedAt = new Date().toISOString()
+  const upsert = db.prepare(
+    `INSERT INTO risk_scores (import_id, tin, status, score_json, error_message, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(import_id, tin) DO UPDATE SET
+       status = excluded.status,
+       score_json = excluded.score_json,
+       error_message = excluded.error_message,
+       updated_at = excluded.updated_at`,
+  )
+
+  db.exec("BEGIN IMMEDIATE")
+  try {
+    for (const update of updates) {
+      const scoreJson = update.status === "scored" ? JSON.stringify(update.score) : null
+      const errorMessage = update.status === "scored" ? null : update.errorMessage
+      upsert.run(importId, update.tin, update.status, scoreJson, errorMessage, updatedAt)
+    }
+    db.exec("COMMIT")
+  } catch (error) {
+    db.exec("ROLLBACK")
+    throw error
+  }
+}
+
 export function saveRiskScore(importId: string, tin: string, score: ScoreResult): void {
   database()
     .prepare(

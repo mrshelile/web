@@ -1,7 +1,7 @@
 import "server-only"
 
 import { RiskEngineError } from "./errors"
-import { parseEngineHealth, parseScoreResult } from "./schemas"
+import { parseEngineHealth, parseScoreResult, parseScoreResults, type BatchScoreOutcome } from "./schemas"
 import type { EngineHealth, ScoreResult, TaxpayerProfile } from "./types"
 
 const DEFAULT_ENGINE_URL = "https://engine.fastapicloud.dev"
@@ -22,7 +22,7 @@ function engineBaseUrl(): string {
   return configured.replace(/\/+$/, "")
 }
 
-async function requestJson(path: "/health" | "/score", init: RequestInit, timeoutMs: number): Promise<unknown> {
+async function requestJson(path: "/health" | "/score" | "/score/batch", init: RequestInit, timeoutMs: number): Promise<unknown> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
   try {
@@ -80,4 +80,25 @@ export async function scoreProfile(profile: TaxpayerProfile): Promise<ScoreResul
       SCORE_TIMEOUT_MS,
     ),
   )
+}
+
+export async function scoreProfiles(profiles: TaxpayerProfile[]): Promise<BatchScoreOutcome[]> {
+  const results = parseScoreResults(
+    await requestJson(
+      "/score/batch",
+      { method: "POST", headers: serviceHeaders(true), body: JSON.stringify(profiles) },
+      SCORE_TIMEOUT_MS,
+    ),
+  )
+  if (
+    results.length !== profiles.length ||
+    results.some(
+      (result, index) =>
+        result.tin !== profiles[index].tin ||
+        (result.score !== null && result.score.tin !== profiles[index].tin),
+    )
+  ) {
+    throw new RiskEngineError("ENGINE_INVALID_RESPONSE", "Risk engine returned mismatched taxpayer results")
+  }
+  return results
 }
