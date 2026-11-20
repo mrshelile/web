@@ -196,6 +196,12 @@ function normalizeFieldValue(
   if (value === null || value === undefined || value === "") return null
 
   if (numericFields.has(field)) {
+    if (
+      typeof value === "string"
+      && ["-", "–", "—", "n/a", "na"].includes(value.trim().toLowerCase())
+    ) {
+      return null
+    }
     const numeric =
       typeof value === "number"
         ? value
@@ -203,7 +209,9 @@ function normalizeFieldValue(
           ? Number(value.replace(/,/g, "").trim())
           : Number.NaN
     if (!Number.isFinite(numeric)) {
-      throw new WorkbookValidationError(`${sheet} row ${rowNumber}: "${field}" must contain a number.`)
+      throw new WorkbookValidationError(
+        `${sheet} row ${rowNumber}: "${field}" must contain a number or be left blank (N/A and dash markers are treated as blank).`,
+      )
     }
     if (field === "extraction_confidence" && (numeric < 0 || numeric > 1)) {
       throw new WorkbookValidationError(

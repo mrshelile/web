@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { internalApiError } from "@/lib/api/errors"
 import { getTaxpayerProfile, saveCaseReview } from "@/lib/data/database"
 import type { CaseStatus } from "@/lib/data/types"
 
@@ -43,18 +44,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: `${label} must be 2,000 characters or fewer.` }, { status: 400 })
     }
   }
-  if (!getTaxpayerProfile(importId, tin)) {
+  let taxpayerProfile: ReturnType<typeof getTaxpayerProfile>
+  try {
+    taxpayerProfile = getTaxpayerProfile(importId, tin)
+  } catch (error) {
+    return internalApiError(error, "POST", "/api/data/cases")
+  }
+  if (!taxpayerProfile) {
     return NextResponse.json({ error: "Taxpayer was not found in this import." }, { status: 404 })
   }
 
-  return NextResponse.json(saveCaseReview(
-    importId,
-    tin,
-    status as CaseStatus,
-    officerNote,
-    taxpayerResponse,
-    missingEvidence,
-    officerFinding,
-    decisionReason,
-  ))
+  try {
+    return NextResponse.json(saveCaseReview(
+      importId,
+      tin,
+      status as CaseStatus,
+      officerNote,
+      taxpayerResponse,
+      missingEvidence,
+      officerFinding,
+      decisionReason,
+    ))
+  } catch (error) {
+    return internalApiError(error, "POST", "/api/data/cases")
+  }
 }

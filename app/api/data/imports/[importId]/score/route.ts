@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { internalApiError } from "@/lib/api/errors"
 import { getTaxpayerProfile, saveNotEvaluable, saveRiskScore, saveRiskScoreError } from "@/lib/data/database"
 import { RiskEngineError, publicEngineError } from "@/lib/risk-engine/errors"
 import { scoreProfile } from "@/lib/risk-engine/client"
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic"
 type RouteContext = { params: Promise<{ importId: string }> }
 
 export async function POST(request: NextRequest, context: RouteContext): Promise<NextResponse> {
+  try {
   const { importId } = await context.params
   let body: unknown
   try {
@@ -51,5 +53,8 @@ export async function POST(request: NextRequest, context: RouteContext): Promise
       return NextResponse.json(publicError.body, { status: publicError.status })
     }
     throw error
+  }
+  } catch (error) {
+    return internalApiError(error, "POST", "/api/data/imports/[importId]/score")
   }
 }

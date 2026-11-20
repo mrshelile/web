@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { NextRequest, NextResponse } from "next/server"
+import { internalApiError } from "@/lib/api/errors"
 import { getDashboard, listImports, saveWorkbookImport } from "@/lib/data/database"
 import { parseExcelWorkbook, WorkbookValidationError } from "@/lib/data/workbook"
 
@@ -9,7 +10,11 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function GET(): Promise<NextResponse> {
-  return NextResponse.json({ imports: listImports() })
+  try {
+    return NextResponse.json({ imports: listImports() })
+  } catch (error) {
+    return internalApiError(error, "GET", "/api/data/imports")
+  }
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -46,13 +51,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (error instanceof WorkbookValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
-    throw error
+    return internalApiError(error, "POST", "/api/data/imports")
   }
 
   const safeFileName = file.name.replace(/[\\/\x00-\x1f]/g, "_").slice(0, 180) || "workbook.xlsx"
-  const savedImport = saveWorkbookImport(randomUUID(), safeFileName, parsed)
-  return NextResponse.json(
-    { import: savedImport, dashboard: getDashboard(savedImport.id) },
-    { status: 201 },
-  )
+  try {
+    const savedImport = saveWorkbookImport(randomUUID(), safeFileName, parsed)
+    return NextResponse.json(
+      { import: savedImport, dashboard: getDashboard(savedImport.id) },
+      { status: 201 },
+    )
+  } catch (error) {
+    return internalApiError(error, "POST", "/api/data/imports")
+  }
 }
