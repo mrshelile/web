@@ -72,7 +72,10 @@ function errorMessage(payload: unknown, fallback: string): string {
   if (typeof record.error === "string") return record.error
   if (typeof record.error === "object" && record.error !== null && "message" in record.error) {
     const message = (record.error as { message?: unknown }).message
-    if (typeof message === "string") return message
+    const requestId = (record.error as { requestId?: unknown }).requestId
+    if (typeof message === "string") {
+      return typeof requestId === "string" ? `${message} (Reference: ${requestId})` : message
+    }
   }
   return fallback
 }
@@ -129,6 +132,7 @@ export default function RiskLensDashboard() {
   const [tab, setTab] = useState<DashboardTab>("overview")
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
   const [health, setHealth] = useState<EngineHealth | null>(null)
+  const [healthError, setHealthError] = useState("")
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -154,13 +158,17 @@ export default function RiskLensDashboard() {
   const loadHealth = useCallback(async () => {
     try {
       const response = await fetch("/api/risk/health", { cache: "no-store" })
+      const payload = await readJsonResponse(response, "Unable to load engine health.")
       if (!response.ok) {
         setHealth(null)
+        setHealthError(errorMessage(payload, "Unable to load engine health."))
         return
       }
-      setHealth((await readJsonResponse(response, "Unable to load engine health.")) as EngineHealth)
-    } catch {
+      setHealth(payload as EngineHealth)
+      setHealthError("")
+    } catch (error) {
       setHealth(null)
+      setHealthError(error instanceof Error ? error.message : "Unable to load engine health.")
     }
   }, [])
 
@@ -185,16 +193,24 @@ export default function RiskLensDashboard() {
       })
 
     fetch("/api/risk/health", { cache: "no-store" })
-      .then(async (response) =>
-        response.ok
-          ? ((await readJsonResponse(response, "Unable to load engine health.")) as EngineHealth)
-          : null,
-      )
-      .then((engineHealth) => {
-        if (active) setHealth(engineHealth)
+      .then(async (response) => {
+        const payload = await readJsonResponse(response, "Unable to load engine health.")
+        if (!response.ok) {
+          throw new Error(errorMessage(payload, "Unable to load engine health."))
+        }
+        return payload as EngineHealth
       })
-      .catch(() => {
-        if (active) setHealth(null)
+      .then((engineHealth) => {
+        if (active) {
+          setHealth(engineHealth)
+          setHealthError("")
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setHealth(null)
+          setHealthError(error instanceof Error ? error.message : "Unable to load engine health.")
+        }
       })
 
     return () => {
@@ -373,7 +389,7 @@ export default function RiskLensDashboard() {
             <span className={`status-dot ${health?.ok ? "status-online" : ""}`} />
             <div>
               <strong>Python engine</strong>
-              <span>{health?.ok ? `Connected · ${health.rule_version}` : "Not connected"}</span>
+              <span>{health?.ok ? `Connected · ${health.rule_version}` : healthError || "Not connected"}</span>
             </div>
             <button className="refresh-button" type="button" aria-label="Refresh engine status" onClick={loadHealth}>
               ↻
@@ -424,7 +440,7 @@ export default function RiskLensDashboard() {
             </div>
             <div className={`engine-pill ${health?.ok ? "engine-pill-online" : ""}`}>
               <span className={`status-dot ${health?.ok ? "status-online" : ""}`} />
-              {health?.ok ? "Risk engine connected" : "Risk engine offline"}
+              {health?.ok ? "Risk engine connected" : healthError ? `Risk engine offline · ${healthError}` : "Risk engine offline"}
             </div>
           </section>
 
