@@ -135,9 +135,8 @@ function cellValue(value: ExcelJS.CellValue, sheet: string, row: number, column:
     return value
   }
   if ("formula" in value) {
-    if ("result" in value) return cellValue(value.result, sheet, row, column)
     throw new WorkbookValidationError(
-      `${sheet} row ${row}, column ${column}: formulas without cached values are not supported.`,
+      `${sheet} row ${row}, column ${column}: formula cells are not supported; upload evaluated values.`,
     )
   }
   if ("richText" in value) return value.richText.map((part) => part.text).join("")

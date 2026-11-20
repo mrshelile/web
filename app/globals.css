@@ -231,6 +231,11 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
 .case-save-row { display: flex; justify-content: space-between; align-items: center; gap: 9px; margin-top: 10px; }
 .case-save-row > small { color: #9aa59f; font-size: 8px; }
 .field-error { margin-top: 8px; color: #a44c41; font-size: 9px; }
+.case-audit-history { margin-top: 10px; padding: 8px 10px; border: 1px solid #edf1ee; border-radius: 6px; background: #fbfcfb; color: #6f8178; font-size: 9px; }
+.case-audit-history summary { cursor: pointer; font-weight: 700; }
+.case-audit-history ol { margin: 8px 0 0; padding-left: 18px; }
+.case-audit-history li { display: grid; gap: 2px; margin-top: 6px; }
+.case-audit-history li span { color: #98a59f; font-size: 8px; }
 .refund-context { display: flex; gap: 9px; margin: 0 18px 17px; padding: 9px 11px; border-radius: 6px; background: #f8f5e9; color: #7e7049; font-size: 9px; line-height: 1.55; }
 .refund-context strong { white-space: nowrap; }
 .source-chip { padding: 5px 7px; border-radius: 5px; background: #edf5f0; color: #4e8066; font-size: 8px; font-weight: 700; }

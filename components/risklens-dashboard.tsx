@@ -249,12 +249,29 @@ export default function RiskLensDashboard() {
     }
   }
 
-  async function saveCase(tin: string, status: CaseStatus, officerNote: string) {
+  async function saveCase(
+    tin: string,
+    status: CaseStatus,
+    officerNote: string,
+    taxpayerResponse: string,
+    missingEvidence: string,
+    officerFinding: string,
+    decisionReason: string,
+  ) {
     if (!dashboard?.activeImportId) return
     const response = await fetch("/api/data/cases", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ importId: dashboard.activeImportId, tin, status, officerNote }),
+      body: JSON.stringify({
+        importId: dashboard.activeImportId,
+        tin,
+        status,
+        officerNote,
+        taxpayerResponse,
+        missingEvidence,
+        officerFinding,
+        decisionReason,
+      }),
     })
     const payload: unknown = await response.json()
     if (!response.ok) throw new Error(errorMessage(payload, "Unable to save case review."))
@@ -542,7 +559,15 @@ function Overview({
   busyTin: string | null
   expandedTin: string | null
   onToggleTin: (tin: string) => void
-  onSaveCase: (tin: string, status: CaseStatus, note: string) => Promise<void>
+  onSaveCase: (
+    tin: string,
+    status: CaseStatus,
+    note: string,
+    taxpayerResponse: string,
+    missingEvidence: string,
+    officerFinding: string,
+    decisionReason: string,
+  ) => Promise<void>
 }) {
   const { summary } = dashboard
   const maxCases = Math.max(summary.highPriority, summary.needsReview, summary.informational, 1)
@@ -658,7 +683,15 @@ function TaxpayerTable({
   expandedTin: string | null
   onScore: (tin: string) => void
   onToggleTin: (tin: string) => void
-  onSaveCase: (tin: string, status: CaseStatus, note: string) => Promise<void>
+  onSaveCase: (
+    tin: string,
+    status: CaseStatus,
+    note: string,
+    taxpayerResponse: string,
+    missingEvidence: string,
+    officerFinding: string,
+    decisionReason: string,
+  ) => Promise<void>
   mode: "worklist" | "refunds"
   compact?: boolean
 }) {
@@ -695,7 +728,17 @@ function TaxpayerTable({
               expanded={expandedTin === taxpayer.tin}
               onScore={() => onScore(taxpayer.tin)}
               onToggle={() => onToggleTin(taxpayer.tin)}
-              onSaveCase={(status, note) => onSaveCase(taxpayer.tin, status, note)}
+              onSaveCase={(status, note, taxpayerResponse, missingEvidence, officerFinding, decisionReason) =>
+                onSaveCase(
+                  taxpayer.tin,
+                  status,
+                  note,
+                  taxpayerResponse,
+                  missingEvidence,
+                  officerFinding,
+                  decisionReason,
+                )
+              }
               mode={mode}
               compact={compact}
             />
@@ -725,7 +768,14 @@ function TableRows({
   expanded: boolean
   onScore: () => void
   onToggle: () => void
-  onSaveCase: (status: CaseStatus, note: string) => Promise<void>
+  onSaveCase: (
+    status: CaseStatus,
+    note: string,
+    taxpayerResponse: string,
+    missingEvidence: string,
+    officerFinding: string,
+    decisionReason: string,
+  ) => Promise<void>
   mode: "worklist" | "refunds"
   compact: boolean
 }) {
@@ -851,10 +901,21 @@ function CaseReview({
   onSave,
 }: {
   taxpayer: TaxpayerDashboardRow
-  onSave: (status: CaseStatus, note: string) => Promise<void>
+  onSave: (
+    status: CaseStatus,
+    note: string,
+    taxpayerResponse: string,
+    missingEvidence: string,
+    officerFinding: string,
+    decisionReason: string,
+  ) => Promise<void>
 }) {
   const [status, setStatus] = useState<CaseStatus>(taxpayer.caseStatus)
   const [note, setNote] = useState(taxpayer.officerNote)
+  const [taxpayerResponse, setTaxpayerResponse] = useState(taxpayer.taxpayerResponse)
+  const [missingEvidence, setMissingEvidence] = useState(taxpayer.missingEvidence)
+  const [officerFinding, setOfficerFinding] = useState(taxpayer.officerFinding)
+  const [decisionReason, setDecisionReason] = useState(taxpayer.decisionReason)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
 
@@ -862,7 +923,7 @@ function CaseReview({
     setSaving(true)
     setError("")
     try {
-      await onSave(status, note)
+      await onSave(status, note, taxpayerResponse, missingEvidence, officerFinding, decisionReason)
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Could not save this review.")
     } finally {
@@ -881,6 +942,31 @@ function CaseReview({
       <label className="field-label">Review note
         <textarea maxLength={2000} onChange={(event) => setNote(event.target.value)} placeholder="Record evidence checked, context and next action…" value={note} />
       </label>
+      <label className="field-label">Taxpayer response / explanation
+        <textarea maxLength={2000} onChange={(event) => setTaxpayerResponse(event.target.value)} placeholder="Record the taxpayer's explanation or correction…" value={taxpayerResponse} />
+      </label>
+      <label className="field-label">Missing evidence
+        <textarea maxLength={2000} onChange={(event) => setMissingEvidence(event.target.value)} placeholder="List specific records or documents still required…" value={missingEvidence} />
+      </label>
+      <label className="field-label">Officer finding
+        <textarea maxLength={2000} onChange={(event) => setOfficerFinding(event.target.value)} placeholder="Document facts and the neutral finding…" value={officerFinding} />
+      </label>
+      <label className="field-label">Decision reason
+        <textarea maxLength={2000} onChange={(event) => setDecisionReason(event.target.value)} placeholder="Record the reason for close, referral or further review…" value={decisionReason} />
+      </label>
+      {taxpayer.caseAuditHistory.length ? (
+        <details className="case-audit-history">
+          <summary>Audit trail ({taxpayer.caseAuditHistory.length})</summary>
+          <ol>
+            {taxpayer.caseAuditHistory.slice(0, 10).map((event) => (
+              <li key={event.id}>
+                <strong>{event.status}</strong>
+                <span>{formatDate(event.updatedAt)} · {event.action}</span>
+              </li>
+            ))}
+          </ol>
+        </details>
+      ) : null}
       <div className="case-save-row">
         <small>{taxpayer.caseUpdatedAt ? `Last saved ${formatDate(taxpayer.caseUpdatedAt)}` : "No review saved yet"}</small>
         <button className="button button-dark button-small" disabled={saving} onClick={() => void save()} type="button">
@@ -919,12 +1005,13 @@ function MneScreen({
       {mneTaxpayers.length ? (
         <div className="table-scroll">
           <table className="taxpayer-table mne-table">
-            <thead><tr><th>Taxpayer</th><th>Revenue</th><th>Related-party charges</th><th>Foreign payments</th><th>Gross margin</th><th>Imported-services VAT</th></tr></thead>
+          <thead><tr><th>Taxpayer</th><th>Revenue</th><th>Related-party charges</th><th>RP charge / revenue</th><th>Foreign payments</th><th>Gross margin</th><th>Imported-services VAT</th></tr></thead>
             <tbody>{mneTaxpayers.map((taxpayer) => (
               <tr key={taxpayer.tin}>
                 <td><div className="taxpayer-cell static"><span className="company-avatar">{taxpayer.name.slice(0, 1).toUpperCase()}</span><span><strong>{taxpayer.name}</strong><small>{taxpayer.tin}{taxpayer.sector ? ` · ${taxpayer.sector}` : ""}</small></span></div></td>
                 <td>{formatNumber(taxpayer.revenue)}</td>
                 <td>{formatNumber(taxpayer.relatedPartyCharges)}</td>
+              <td>{taxpayer.revenue > 0 ? `${((taxpayer.relatedPartyCharges / taxpayer.revenue) * 100).toFixed(1)}%` : "Not evaluable"}</td>
                 <td>{formatNumber(taxpayer.foreignPayments)}</td>
                 <td>{taxpayer.grossMarginPct ? `${taxpayer.grossMarginPct}%` : "—"}</td>
                 <td>{formatNumber(taxpayer.importedServicesVatDeclared)}</td>

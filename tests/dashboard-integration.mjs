@@ -97,6 +97,10 @@ const caseResponse = await fetch(`${baseUrl}/api/data/cases`, {
     tin: "SYNTH-TEST-01",
     status: "Reviewing",
     officerNote: "Synthetic evidence review only.",
+    taxpayerResponse: "The related-party fee supports a genuine local service.",
+    missingEvidence: "Contract and proof of service.",
+    officerFinding: "Further verification is required.",
+    decisionReason: "The evidence is insufficient for closure.",
   }),
 })
 assert.equal(caseResponse.status, 200, "case review should persist in SQLite")
@@ -108,6 +112,9 @@ const refreshed = await refreshedResponse.json()
 assert.equal(refreshed.taxpayers[0].scoreStatus, "scored")
 assert.equal(refreshed.taxpayers[0].caseStatus, "Reviewing")
 assert.equal(refreshed.taxpayers[0].officerNote, "Synthetic evidence review only.")
+assert.equal(refreshed.taxpayers[0].taxpayerResponse, "The related-party fee supports a genuine local service.")
+assert.equal(refreshed.taxpayers[0].missingEvidence, "Contract and proof of service.")
+assert.ok(refreshed.taxpayers[0].caseAuditHistory.length >= 1)
 
 const invalidWorkbook = new ExcelJS.Workbook()
 const invalidTaxpayers = invalidWorkbook.addWorksheet("Taxpayers")
@@ -129,5 +136,21 @@ const legacyForm = new FormData()
 legacyForm.set("file", new Blob(["not an xlsx"]), "legacy.xls")
 const legacyUpload = await fetch(`${baseUrl}/api/data/imports`, { method: "POST", body: legacyForm })
 assert.equal(legacyUpload.status, 400, "legacy .xls files should receive a clear validation error")
+
+const formulaWorkbook = new ExcelJS.Workbook()
+const formulaTaxpayers = formulaWorkbook.addWorksheet("Taxpayers")
+formulaTaxpayers.addRow(["tin", "name", "revenue"])
+formulaTaxpayers.addRow(["SYNTH-FORMULA-01", "Formula Demo", { formula: "100+200", result: 300 }])
+const formulaForm = new FormData()
+formulaForm.set(
+  "file",
+  new Blob([await formulaWorkbook.xlsx.writeBuffer()], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  }),
+  "formula-cells.xlsx",
+)
+const formulaUpload = await fetch(`${baseUrl}/api/data/imports`, { method: "POST", body: formulaForm })
+assert.equal(formulaUpload.status, 400, "formula cells should be rejected to avoid using stale calculated values")
+assert.match((await formulaUpload.json()).error, /formula cells are not supported/i)
 
 console.log("Dashboard integration passed: template, Excel import, SQLite persistence, Python scoring, and case review")

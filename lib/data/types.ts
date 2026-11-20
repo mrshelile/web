@@ -16,6 +16,29 @@ export type CaseStatus =
   | "Referred"
   | "Closed"
 
+export type CaseAuditEvent = {
+  id: number
+  action: "created" | "updated"
+  status: CaseStatus
+  officerNote: string
+  taxpayerResponse: string
+  missingEvidence: string
+  officerFinding: string
+  decisionReason: string
+  updatedAt: string
+}
+
+export type CaseReview = {
+  status: CaseStatus
+  officerNote: string
+  taxpayerResponse: string
+  missingEvidence: string
+  officerFinding: string
+  decisionReason: string
+  updatedAt: string | null
+  auditHistory: CaseAuditEvent[]
+}
+
 export type TaxpayerDashboardRow = {
   tin: string
   name: string
@@ -35,6 +58,11 @@ export type TaxpayerDashboardRow = {
   caseStatus: CaseStatus
   officerNote: string
   caseUpdatedAt: string | null
+  taxpayerResponse: string
+  missingEvidence: string
+  officerFinding: string
+  decisionReason: string
+  caseAuditHistory: CaseAuditEvent[]
 }
 
 export type DashboardSummary = {

@@ -6,6 +6,7 @@ import { DatabaseSync } from "node:sqlite"
 import { parseScoreResult } from "@/lib/risk-engine/schemas"
 import type { ScoreResult, TaxpayerProfile } from "@/lib/risk-engine/types"
 import type {
+  CaseAuditEvent,
   CaseStatus,
   DashboardData,
   DashboardSummary,
@@ -72,7 +73,31 @@ function createDatabase(): DatabaseSync {
       updated_at TEXT NOT NULL,
       PRIMARY KEY(import_id, tin)
     );
+    CREATE TABLE IF NOT EXISTS case_audit_events (
+      id INTEGER PRIMARY KEY,
+      import_id TEXT NOT NOT NULL REFERENCES imports(id) ON DELETE CASCADE,
+      tin TEXT NOT NULL,
+      action TEXT NOT NULL CHECK(action IN ('created', 'updated')),
+      status TEXT NOT NULL CHECK(status IN ('New', 'Reviewing', 'Request information', 'Referred', 'Closed')),
+      officer_note TEXT NOT NULL DEFAULT '',
+      taxpayer_response TEXT NOT NULL DEFAULT '',
+      missing_evidence TEXT NOT NULL DEFAULT '',
+      officer_finding TEXT NOT NULL DEFAULT '',
+      decision_reason TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS case_audit_events_case
+      ON case_audit_events(import_id, tin, id);
   `)
+  const caseColumns = db.prepare("PRAGMA table_info(case_reviews)").all().map((row) => text(row.name))
+  for (const [column, definition] of [
+    ["taxpayer_response", "TEXT NOT NULL DEFAULT ''"],
+    ["missing_evidence", "TEXT NOT NULL DEFAULT ''"],
+    ["officer_finding", "TEXT NOT NULL DEFAULT ''"],
+    ["decision_reason", "TEXT NOT NULL DEFAULT ''"],
+  ] as const) {
+    if (!caseColumns.includes(column)) db.exec(`ALTER TABLE case_reviews ADD COLUMN ${column} ${definition};`)
+  }
   return db
 }
 
@@ -275,17 +300,64 @@ export function saveCaseReview(
   tin: string,
   status: CaseStatus,
   officerNote: string,
-): { status: CaseStatus; officerNote: string; updatedAt: string } {
+  taxpayerResponse = "",
+  missingEvidence = "",
+  officerFinding = "",
+  decisionReason = "",
+): { status: CaseStatus; officerNote: string; taxpayerResponse: string; missingEvidence: string; officerFinding: string; decisionReason: string; updatedAt: string } {
   const updatedAt = new Date().toISOString()
-  database()
-    .prepare(
-      `INSERT INTO case_reviews (import_id, tin, status, officer_note, updated_at)
-       VALUES (?, ?, ?, ?, ?)
+  const db = database()
+  const existing = db.prepare("SELECT 1 FROM case_reviews WHERE import_id = ? AND tin = ?").get(importId, tin)
+  db.exec("BEGIN IMMEDIATE")
+  try {
+    db.prepare(
+      `INSERT INTO case_reviews (
+         import_id, tin, status, officer_note, taxpayer_response, missing_evidence,
+         officer_finding, decision_reason, updated_at
+       )
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(import_id, tin) DO UPDATE SET
-         status = excluded.status, officer_note = excluded.officer_note, updated_at = excluded.updated_at`,
+         status = excluded.status,
+         officer_note = excluded.officer_note,
+         taxpayer_response = excluded.taxpayer_response,
+         missing_evidence = excluded.missing_evidence,
+         officer_finding = excluded.officer_finding,
+         decision_reason = excluded.decision_reason,
+         updated_at = excluded.updated_at`,
+    ).run(
+      importId,
+      tin,
+      status,
+      officerNote,
+      taxpayerResponse,
+      missingEvidence,
+      officerFinding,
+      decisionReason,
+      updatedAt,
     )
-    .run(importId, tin, status, officerNote, updatedAt)
-  return { status, officerNote, updatedAt }
+    db.prepare(
+      `INSERT INTO case_audit_events (
+         import_id, tin, action, status, officer_note, taxpayer_response,
+         missing_evidence, officer_finding, decision_reason, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      importId,
+      tin,
+      existing ? "updated" : "created",
+      status,
+      officerNote,
+      taxpayerResponse,
+      missingEvidence,
+      officerFinding,
+      decisionReason,
+      updatedAt,
+    )
+    db.exec("COMMIT")
+  } catch (error) {
+    db.exec("ROLLBACK")
+    throw error
+  }
+  return { status, officerNote, taxpayerResponse, missingEvidence, officerFinding, decisionReason, updatedAt }
 }
 
 const emptySummary: DashboardSummary = {
@@ -338,16 +410,54 @@ export function getDashboard(importId?: string | null): DashboardData | null {
   }
   const caseRows = db
     .prepare(
-      `SELECT tin, status, officer_note, updated_at FROM case_reviews WHERE import_id = ?`,
+      `SELECT tin, status, officer_note, taxpayer_response, missing_evidence, officer_finding,
+              decision_reason, updated_at
+       FROM case_reviews WHERE import_id = ?`,
     )
     .all(activeImport.id)
-  const cases = new Map<string, { status: CaseStatus; note: string; updatedAt: string | null }>()
+  const cases = new Map<string, {
+    status: CaseStatus
+    note: string
+    taxpayerResponse: string
+    missingEvidence: string
+    officerFinding: string
+    decisionReason: string
+    updatedAt: string | null
+  }>()
   for (const row of caseRows) {
     cases.set(text(row.tin), {
       status: text(row.status) as CaseStatus,
       note: text(row.officer_note),
+      taxpayerResponse: text(row.taxpayer_response),
+      missingEvidence: text(row.missing_evidence),
+      officerFinding: text(row.officer_finding),
+      decisionReason: text(row.decision_reason),
       updatedAt: text(row.updated_at),
     })
+  }
+  const auditRows = db
+    .prepare(
+      `SELECT id, tin, action, status, officer_note, taxpayer_response, missing_evidence,
+              officer_finding, decision_reason, updated_at
+       FROM case_audit_events WHERE import_id = ? ORDER BY id DESC`,
+    )
+    .all(activeImport.id)
+  const auditHistory = new Map<string, CaseAuditEvent[]>()
+  for (const row of auditRows) {
+    const tin = text(row.tin)
+    const events = auditHistory.get(tin) ?? []
+    events.push({
+      id: numeric(row.id),
+      action: text(row.action) === "created" ? "created" : "updated",
+      status: text(row.status) as CaseStatus,
+      officerNote: text(row.officer_note),
+      taxpayerResponse: text(row.taxpayer_response),
+      missingEvidence: text(row.missing_evidence),
+      officerFinding: text(row.officer_finding),
+      decisionReason: text(row.decision_reason),
+      updatedAt: text(row.updated_at),
+    })
+    auditHistory.set(tin, events)
   }
 
   const taxpayers = new Map<string, TaxpayerDashboardRow>()
@@ -386,6 +496,11 @@ export function getDashboard(importId?: string | null): DashboardData | null {
         caseStatus: savedCase?.status ?? "New",
         officerNote: savedCase?.note ?? "",
         caseUpdatedAt: savedCase?.updatedAt ?? null,
+        taxpayerResponse: savedCase?.taxpayerResponse ?? "",
+        missingEvidence: savedCase?.missingEvidence ?? "",
+        officerFinding: savedCase?.officerFinding ?? "",
+        decisionReason: savedCase?.decisionReason ?? "",
+        caseAuditHistory: auditHistory.get(row.tin) ?? [],
       }
       taxpayers.set(row.tin, taxpayer)
     }

@@ -33,9 +33,20 @@ Engine URL and optional service authentication are server-side deployment settin
 3. Group records by taxpayer and financial period; show source, row and coverage counts.
 4. Submit a validated profile through the Next.js API to the Python engine.
 5. Rank companies for review and display the score, confidence, triggered rules, evidence, limitations and suggested officer checks.
-6. Open a taxpayer/case panel, record notes and a decision, then escalate or close the review.
-7. Track estimated recovery scenarios separately from assessed or collected revenue.
-8. Produce filtered operational and executive reports from persisted, permission-checked records.
+6. Open a taxpayer review, record a case status and officer note.
+7. Optionally adjust an illustrative recovery scenario, clearly separate from assessed or collected revenue.
+
+## Minimum viable product boundary
+
+The current build is a local, single-user MVP to demonstrate the proposal, not a production RSL system:
+
+- One officer dashboard with overview, audit worklist, VAT refund review, MNE data view, recovery scenarios and workbook-import history.
+- Excel `.xlsx` template and upload, server-side validation, row/source counts and local SQLite persistence.
+- Server-side Next.js API sends supported taxpayer profiles to the separate Python R1–R5 scoring service.
+- Officers can review returned evidence and save an MVP case status/note in SQLite.
+- Proposal-only corporate-tax signals are displayed as source fields, not scored.
+
+Not part of this MVP: RSL login/RBAC, multiple users, live RSL/Lekuka connectors, secure/hosted database, append-only audit history, automatic decisions, proposal-only rules in the scorer, production case assignment, taxpayer portal, bulk scoring jobs, formal report/export, assessments or real collection data. The local SQLite file is unencrypted and deployment storage may be ephemeral; do not use confidential live taxpayer data.
 
 ## Unified modules
 
@@ -44,9 +55,10 @@ Engine URL and optional service authentication are server-side deployment settin
 - `.xlsx` upload and a downloadable multi-worksheet template.
 - Server-side workbook parsing, source normalization and SQLite persistence.
 - Import limits and validation for file size, worksheet count, row count, TINs, numeric fields, booleans and duplicate column headings.
+- Workbook guide sheet states source, privacy, validation and scoring limits; TIN columns are formatted as text to preserve leading zeroes.
 - Header aliases for common TIN, taxpayer, invoice and amount labels.
 - Import source, row and coverage counts.
-- Duplicate detection, validation, correction workflow and import history in the complete platform.
+- Cross-import duplicate reconciliation, editable mapping/correction workflow and source-version history remain future work.
 
 ### 2. Taxpayer profile
 
@@ -109,9 +121,9 @@ Clearly label estimates as illustrative. Keep estimated revenue distinct from ap
 
 ### 7. Executive dashboard, reporting and alerts
 
-Executive views may show taxpayer counts, risk distribution, liabilities, potential revenue at risk, assessed/recovered/unrecovered revenue, compliance and trends by time, sector, tax type and geography. Operational views include audit priority, investigations, reconciliation, risk trends, revenue leakage and officer workload.
+The MVP overview shows imported taxpayer/row counts, priority distribution, average confidence, indicative engine exposure, refund claims and source coverage. It does not claim assessed/recovered revenue. Future executive views may show liabilities, compliance and trends by time, sector, tax type and geography.
 
-Alerts may cover new or rising high risk, discrepancies, assignments, deadlines, evidence, supervisor approvals, assessments, overdue payments and recovery targets. Exports may include CSV, Excel and PDF, with scheduled reports in the complete platform.
+Alerts, investigations, workload views, scheduled reports and CSV/Excel/PDF exports are future work.
 
 ### 8. Compliance, investigations and revenue
 
@@ -143,15 +155,15 @@ Implemented in the current workspace:
 - R1–R5 scoring, confidence, priority and evidence; R3 uses merchant statements only.
 - Synthetic sample scoring and API/integration tests.
 
-Not implemented in the current web application:
+Not implemented in the current MVP:
 
-- Approved live RSL connectors, login/RBAC, multi-user access, secure production database/audit storage, automatic processing queues, executive reporting/exports, taxpayer guidance, assessment/payment workflows, and the proposed additional tax rules.
+- Approved live RSL connectors, login/RBAC, multi-user access, secure hosted database/append-only audit storage, automatic processing queues, formal executive reporting/exports, taxpayer guidance, assessment/payment workflows, and the proposed additional tax rules.
 
-## Recommended delivery order
+## MVP follow-up and production gates
 
-1. Validate the workbook template and dashboard with synthetic or approved masked data.
-2. Agree the common score/classification model and decide whether corporate-tax rules are a separate family or a new engine version.
-3. Integrate approved RSL identity and service contracts; replace local SQLite with approved secure storage before any live taxpayer use.
-4. Add assessments/recovery, compliance, executive reporting, alerts, administration and advanced intelligence incrementally.
+1. Validate the workbook template and screening behavior with synthetic or approved masked data.
+2. Measure rules against reviewed cases and approve RSL thresholds before presenting operational performance.
+3. Before any live data: implement RSL identity, role/case authorization, record-view logging, an append-only audit store and approved hosting.
+4. Replace local SQLite before shared or production deployment; then add approved RSL sources and the remaining modules in phases.
 
-The RSL connectors and full-platform modules remain a roadmap until their data and identity contracts are available. The included SQLite and case notes are for a local proposal prototype only. No production login, secure audit trail or real revenue figures are implied by this specification.
+The RSL connectors and full-platform modules remain a roadmap until their data and identity contracts are available. SQLite, scoring, case notes and scenarios in this MVP are for a local proposal prototype only. No production login, secure audit trail or real revenue figures are implied by this specification.
