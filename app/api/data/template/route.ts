@@ -16,6 +16,10 @@ const sheetTitles: Record<string, string> = {
   foreign_services: "Foreign Services",
   payroll: "Payroll",
   related_parties: "Related Parties",
+  e_payments: "ePayments",
+  e_certificates: "e-Certificates",
+  contract_terms: "Contract Terms",
+  profit_sharing: "Profit Sharing",
 }
 
 export async function GET(): Promise<NextResponse> {
@@ -32,6 +36,7 @@ export async function GET(): Promise<NextResponse> {
     ["Use one row per taxpayer, VAT period or source transaction, as appropriate. Leave unknown values blank; do not estimate or invent them."],
     ["Amount fields must be numeric. Boolean fields accept Yes/No, True/False or 1/0."],
     ["Current Python screening is R1–R5 only. Corporate-tax, WHT, customs, payroll and imported-services sheets are stored for review but are not scored."],
+    ["Cross-tax evidence sheets are imported as review context only. Contract rates and clauses must be human-verified; no AI extraction or external RSL integration is performed."],
     ["Do not upload bank transactions or M-Pesa statements."],
     ["Supported format: .xlsx. Upload limit: 10 MB, 20 worksheets and 20,000 total data rows."],
   ])

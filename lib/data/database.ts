@@ -8,11 +8,17 @@ import type { ScoreResult, TaxpayerProfile } from "@/lib/risk-engine/types"
 import type {
   CaseAuditEvent,
   CaseStatus,
+  CertificateRecord,
+  ContractTerm,
   DashboardData,
   DashboardSummary,
+  EPaymentScheduleLine,
   ImportSummary,
   ParsedWorkbook,
+  PayrollBenefitRecord,
+  ProfitSharingRecord,
   TaxpayerDashboardRow,
+  WithholdingRecord,
 } from "./types"
 
 type RiskLensGlobal = typeof globalThis & { __riskLensDatabase?: DatabaseSync }
@@ -144,6 +150,11 @@ function asBoolean(value: unknown, field: string): boolean {
 
 function nullableText(value: unknown): string | null {
   return value === null || value === undefined || value === "" ? null : String(value)
+}
+
+function nullableNumber(value: unknown, field: string): number | null {
+  if (value === null || value === undefined || value === "") return null
+  return asNumber(value, field)
 }
 
 export function saveWorkbookImport(
@@ -494,6 +505,12 @@ export function getDashboard(importId?: string | null): DashboardData | null {
         negativeVatPeriods: 0,
         duplicateInvoiceCount: 0,
         quarantinedInvoiceCount: 0,
+        epaymentsLines: [],
+        certificates: [],
+        contractTerms: [],
+        withholdingRecords: [],
+        profitSharingRecords: [],
+        payrollBenefitRecords: [],
         sourceCounts: {},
         score: savedScore?.score ?? null,
         scoreStatus:
@@ -573,6 +590,71 @@ export function getDashboard(importId?: string | null): DashboardData | null {
       taxpayer.payrollAmount += asNumber(data.payroll_amount, "payroll_amount")
       taxpayer.expatriateCount += asNumber(data.expatriate_count, "expatriate_count")
       taxpayer.payeDeclared += asNumber(data.paye_declared, "paye_declared")
+      taxpayer.payrollBenefitRecords.push({
+        period: String(data.period ?? ""),
+        expatriateCount: asNumber(data.expatriate_count, "expatriate_count"),
+        salaryAmount: nullableNumber(data.salary_amount, "salary_amount"),
+        cashAllowances: nullableNumber(data.cash_allowances, "cash_allowances"),
+        nonCashBenefits: nullableNumber(data.non_cash_benefits, "non_cash_benefits"),
+        payeDeclared: nullableNumber(data.paye_declared, "paye_declared"),
+        contractReference: nullableText(data.contract_reference),
+      })
+    }
+    if (row.sheet_key === "e_payments") {
+      taxpayer.epaymentsLines.push({
+        reference: nullableText(data.line_reference) ?? `line ${taxpayer.epaymentsLines.length + 1}`,
+        period: String(data.period ?? ""),
+        amount: asNumber(data.amount, "ePayments amount"),
+        invoiceReference: nullableText(data.invoice_reference ?? data.invoice_id),
+        supplierTin: nullableText(data.supplier_tin),
+        attachmentStatus: String(data.attachment_status ?? "").trim().toLowerCase(),
+        documentReference: nullableText(data.document_reference),
+      })
+    }
+    if (row.sheet_key === "e_certificates") {
+      taxpayer.certificates.push({
+        reference: nullableText(data.certificate_reference) ?? `row ${taxpayer.certificates.length + 1}`,
+        contractReference: nullableText(data.contract_reference),
+        period: String(data.period ?? ""),
+        taxType: String(data.tax_type ?? ""),
+        payee: nullableText(data.payee),
+        taxBase: nullableNumber(data.tax_base, "certificate tax base"),
+        claimedRate: nullableNumber(data.claimed_rate, "claimed tax rate"),
+        claimedAmount: nullableNumber(data.claimed_amount, "claimed tax amount"),
+      })
+    }
+    if (row.sheet_key === "contract_terms") {
+      taxpayer.contractTerms.push({
+        reference: nullableText(data.contract_reference) ?? `row ${taxpayer.contractTerms.length + 1}`,
+        effectiveFrom: String(data.effective_from ?? ""),
+        effectiveTo: String(data.effective_to ?? ""),
+        taxBase: nullableNumber(data.tax_base, "contract tax base"),
+        contractualRate: nullableNumber(data.contractual_rate, "contractual tax rate"),
+        clauseReference: nullableText(data.clause_reference),
+        extractionConfidence: nullableNumber(data.extraction_confidence, "extraction confidence"),
+        validationStatus: String(data.validation_status ?? "").trim(),
+      })
+    }
+    if (row.sheet_key === "withholding_tax") {
+      taxpayer.withholdingRecords.push({
+        certificateReference: nullableText(data.certificate_reference),
+        period: String(data.period ?? ""),
+        payee: nullableText(data.payee),
+        paymentAmount: nullableNumber(data.payment_amount, "withholding payment amount"),
+        withholdingAmount: nullableNumber(data.withholding_tax_amount, "withholding amount"),
+        taxBase: nullableNumber(data.tax_base, "withholding tax base"),
+        rate: nullableNumber(data.rate, "withholding rate"),
+      })
+    }
+    if (row.sheet_key === "profit_sharing") {
+      taxpayer.profitSharingRecords.push({
+        period: String(data.period ?? ""),
+        relatedTin: nullableText(data.related_tin),
+        allocationKey: nullableText(data.allocation_key),
+        allocatedAmount: nullableNumber(data.allocated_amount, "allocated profit"),
+        declaredAmount: nullableNumber(data.declared_amount, "declared profit share"),
+        functionsAssetsRisksReference: nullableText(data.functions_assets_risks_reference),
+      })
     }
   }
 

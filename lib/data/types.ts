@@ -39,6 +39,67 @@ export type CaseReview = {
   auditHistory: CaseAuditEvent[]
 }
 
+export type EPaymentScheduleLine = {
+  reference: string
+  period: string
+  amount: number
+  invoiceReference: string | null
+  supplierTin: string | null
+  attachmentStatus: string
+  documentReference: string | null
+}
+
+export type CertificateRecord = {
+  reference: string
+  contractReference: string | null
+  period: string
+  taxType: string
+  payee: string | null
+  taxBase: number | null
+  claimedRate: number | null
+  claimedAmount: number | null
+}
+
+export type ContractTerm = {
+  reference: string
+  effectiveFrom: string
+  effectiveTo: string
+  taxBase: number | null
+  contractualRate: number | null
+  clauseReference: string | null
+  extractionConfidence: number | null
+  validationStatus: string
+}
+
+export type WithholdingRecord = {
+  certificateReference: string | null
+  period: string
+  payee: string | null
+  paymentAmount: number | null
+  withholdingAmount: number | null
+  taxBase: number | null
+  rate: number | null
+}
+
+export type ProfitSharingRecord = {
+  period: string
+  relatedTin: string | null
+  allocationKey: string | null
+  allocatedAmount: number | null
+  declaredAmount: number | null
+  functionsAssetsRisksReference: string | null
+}
+
+export type PayrollBenefitRecord = {
+  period: string
+  expatriateCount: number
+  salaryAmount: number | null
+  cashAllowances: number | null
+  nonCashBenefits: number | null
+  payeDeclared: number | null
+  contractReference: string | null
+}
+
 export type TaxpayerDashboardRow = {
   tin: string
   name: string
@@ -62,6 +123,12 @@ export type TaxpayerDashboardRow = {
   negativeVatPeriods: number
   duplicateInvoiceCount: number
   quarantinedInvoiceCount: number
+  epaymentsLines: EPaymentScheduleLine[]
+  certificates: CertificateRecord[]
+  contractTerms: ContractTerm[]
+  withholdingRecords: WithholdingRecord[]
+  profitSharingRecords: ProfitSharingRecord[]
+  payrollBenefitRecords: PayrollBenefitRecord[]
   sourceCounts: Record<string, number>
   score: ScoreResult | null
   scoreStatus: "unscored" | "scored" | "error" | "not_evaluable"

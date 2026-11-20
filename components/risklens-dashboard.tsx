@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react"
 import type { CaseStatus, DashboardData, TaxpayerDashboardRow } from "@/lib/data/types"
 
-type DashboardTab = "overview" | "worklist" | "refunds" | "mne" | "recovery" | "imports"
+type DashboardTab = "overview" | "worklist" | "refunds" | "mne" | "evidence" | "recovery" | "imports"
 type EngineHealth = { ok: boolean; rule_version: string }
 type Scenario = { name: string; adjustment: number; auditSuccess: number; collectionRate: number }
 
@@ -12,6 +12,7 @@ const navigation: Array<{ id: DashboardTab; label: string; marker: string }> = [
   { id: "worklist", label: "Audit worklist", marker: "AU" },
   { id: "refunds", label: "VAT refund review", marker: "VA" },
   { id: "mne", label: "MNE screening", marker: "MN" },
+  { id: "evidence", label: "Cross-tax evidence", marker: "CX" },
   { id: "recovery", label: "Recovery scenarios", marker: "RC" },
   { id: "imports", label: "Data & imports", marker: "DA" },
 ]
@@ -48,6 +49,10 @@ function titleFor(tab: DashboardTab): { title: string; subtitle: string } {
     mne: {
       title: "Multinational screening",
       subtitle: "Review related-party and cross-border indicators without treating them as scored rules.",
+    },
+    evidence: {
+      title: "Cross-tax evidence review",
+      subtitle: "Check imported schedule attachments and cross-tax references using workbook evidence.",
     },
     recovery: {
       title: "Recovery scenarios",
@@ -209,6 +214,15 @@ export default function RiskLensDashboard() {
         && taxpayer.lowTaxJurisdictionPayments <= 0
         && taxpayer.importedServicesVatDeclared <= 0
         && taxpayer.payrollAmount <= 0
+      ) return false
+      if (
+        tab === "evidence"
+        && taxpayer.epaymentsLines.length === 0
+        && taxpayer.certificates.length === 0
+        && taxpayer.contractTerms.length === 0
+        && taxpayer.withholdingRecords.length === 0
+        && taxpayer.profitSharingRecords.length === 0
+        && taxpayer.payrollBenefitRecords.length === 0
       ) return false
       if (tab === "worklist" && taxpayer.scoreStatus === "not_evaluable") return false
       return !term || taxpayer.name.toLowerCase().includes(term) || taxpayer.tin.toLowerCase().includes(term)
@@ -482,6 +496,7 @@ export default function RiskLensDashboard() {
                 </section>
               ) : null}
               {tab === "mne" ? <MneScreen taxpayers={visibleTaxpayers} search={search} onSearch={setSearch} /> : null}
+              {tab === "evidence" ? <CrossTaxEvidenceScreen taxpayers={visibleTaxpayers} search={search} onSearch={setSearch} /> : null}
               {tab === "recovery" ? (
                 <RecoveryScreen
                   highPriority={dashboard.summary.highPriority}
@@ -1090,6 +1105,245 @@ function MneScreen({
         </div>
       ) : null}
       <div className="policy-footnote">International transactions, losses and recurring refunds are not inherently abusive. Officer review and source evidence are required.</div>
+    </section>
+  )
+}
+
+function formatRate(value: number | null): string {
+  return value === null ? "Not provided" : `${value.toFixed(2)}%`
+}
+
+function formatConfidence(value: number | null): string {
+  return value === null ? "not provided" : `${Math.round(value * 100)}%`
+}
+
+function CrossTaxEvidenceScreen({
+  taxpayers,
+  search,
+  onSearch,
+}: {
+  taxpayers: TaxpayerDashboardRow[]
+  search: string
+  onSearch: (value: string) => void
+}) {
+  return (
+    <section className="panel data-panel cross-tax-panel">
+      <div className="panel-heading panel-heading-wrap">
+        <div>
+          <div className="section-kicker">WORKBOOK-BASED · REVIEW ONLY</div>
+          <h2>Cross-tax evidence completeness</h2>
+          <p>Imported ePayments, e-Certificates, WHT, contract, profit-sharing and payroll records are shown together for targeted verification.</p>
+        </div>
+        <div className="table-search">
+          <span aria-hidden="true">⌕</span>
+          <input
+            aria-label="Search cross-tax evidence"
+            onChange={(event) => onSearch(event.target.value)}
+            placeholder="Search TIN or name"
+            value={search}
+          />
+        </div>
+      </div>
+      <div className="rule-roadmap-banner">
+        <strong>No live connector or AI extraction</strong>
+        <span>Records come only from the uploaded workbook. Contract terms and clauses must be verified by an officer. Differences are evidence leads, not tax findings, and are not added to R1–R5 scores.</span>
+      </div>
+      {taxpayers.length ? (
+        <div className="cross-tax-taxpayers">
+          {taxpayers.map((taxpayer) => (
+            <article className="cross-tax-taxpayer" key={taxpayer.tin}>
+              <header>
+                <div>
+                  <strong>{taxpayer.name}</strong>
+                  <span>{taxpayer.tin}{taxpayer.taxYear ? ` · ${taxpayer.taxYear}` : ""}</span>
+                </div>
+                <span className="subtle-badge">{Object.values(taxpayer.sourceCounts).reduce((sum, count) => sum + count, 0)} linked rows</span>
+              </header>
+
+              {taxpayer.epaymentsLines.length ? (
+                <section className="cross-tax-section">
+                  <h3>VAT schedule attachments · ePayments</h3>
+                  <div className="cross-tax-records">
+                    {taxpayer.epaymentsLines.map((line, index) => {
+                      const status = line.attachmentStatus
+                      const attached = ["attached", "present", "complete", "yes", "true"].includes(status)
+                      const missing = ["missing", "none", "no", "false", "not_attached"].includes(status)
+                      const needsReview = !attached || !line.documentReference
+                      const label = attached
+                        ? line.documentReference
+                          ? "Attachment recorded"
+                          : "Attachment reference missing"
+                        : missing
+                          ? "Attachment reported missing"
+                          : "Attachment status unconfirmed"
+                      return (
+                        <div className="cross-tax-record" key={`${line.reference}-${index}`}>
+                          <div>
+                            <strong>{line.reference}</strong>
+                            <span>{line.period || "Period not provided"} · {formatNumber(line.amount)}</span>
+                          </div>
+                          <span className={`evidence-tag ${needsReview ? "evidence-tag-review" : "evidence-tag-complete"}`}>{label}</span>
+                          <small>
+                            Invoice {line.invoiceReference ?? "not provided"} · Supplier {line.supplierTin ?? "not provided"} · Document {line.documentReference ?? "not linked"}
+                          </small>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </section>
+              ) : null}
+
+              {taxpayer.certificates.length ? (
+                <section className="cross-tax-section">
+                  <h3>e-Certificates and withholding tax references</h3>
+                  <div className="cross-tax-records">
+                    {taxpayer.certificates.map((certificate, index) => {
+                      const linkedWht = certificate.reference
+                        ? taxpayer.withholdingRecords.filter(
+                            (record) => record.certificateReference === certificate.reference,
+                          )
+                        : []
+                      const whtTotal = linkedWht.reduce(
+                        (sum, record) => sum + (record.withholdingAmount ?? 0),
+                        0,
+                      )
+                      return (
+                        <div className="cross-tax-record" key={`${certificate.reference}-${index}`}>
+                          <div>
+                            <strong>{certificate.reference}</strong>
+                            <span>{certificate.taxType || "Tax type not provided"} · {certificate.period || "Period not provided"} · {certificate.payee ?? "Payee not provided"}</span>
+                          </div>
+                          <small>
+                            Certificate base {certificate.taxBase === null ? "not provided" : formatNumber(certificate.taxBase)} · claimed rate {formatRate(certificate.claimedRate)} · claimed amount {certificate.claimedAmount === null ? "not provided" : formatNumber(certificate.claimedAmount)}
+                          </small>
+                          <small>
+                            Linked WHT rows: {linkedWht.length} · reported withholding {linkedWht.length ? formatNumber(whtTotal) : "no matching certificate reference"}
+                            {linkedWht.length && certificate.claimedAmount !== null
+                              ? ` · amount difference ${formatNumber(certificate.claimedAmount - whtTotal)} (verify treatment and timing)`
+                              : ""}
+                          </small>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </section>
+              ) : null}
+
+              {taxpayer.contractTerms.length ? (
+                <section className="cross-tax-section">
+                  <h3>Contract rate and clause review</h3>
+                  <div className="cross-tax-records">
+                    {taxpayer.contractTerms.map((term, index) => {
+                      const matchingCertificates = taxpayer.certificates.filter(
+                        (certificate) => certificate.contractReference === term.reference,
+                      )
+                      return (
+                        <div className="cross-tax-record" key={`${term.reference}-${index}`}>
+                          <div>
+                            <strong>{term.reference}</strong>
+                            <span>Effective {term.effectiveFrom || "date not provided"} to {term.effectiveTo || "date not provided"}</span>
+                          </div>
+                          <small>
+                            Contract rate {formatRate(term.contractualRate)} · clause {term.clauseReference ?? "not cited"} · extraction confidence {formatConfidence(term.extractionConfidence)}
+                          </small>
+                          <small>Validation status: {term.validationStatus || "not recorded"} · matching certificate(s): {matchingCertificates.length}</small>
+                          {matchingCertificates.map((certificate) => (
+                            <small key={`${term.reference}-${certificate.reference}`}>
+                              Certificate {certificate.reference}: claimed {formatRate(certificate.claimedRate)}
+                              {term.contractualRate !== null && certificate.claimedRate !== null
+                                ? ` · variance ${(certificate.claimedRate - term.contractualRate).toFixed(2)} percentage points`
+                                : " · rate variance not evaluable"}
+                              {term.taxBase !== null && certificate.taxBase !== null && term.taxBase !== certificate.taxBase
+                                ? " · tax bases differ; verify before comparison"
+                                : ""}
+                            </small>
+                          ))}
+                        </div>
+                      )
+                    })}
+                    {taxpayer.certificates
+                      .filter((certificate) => certificate.contractReference)
+                      .filter((certificate) => !taxpayer.contractTerms.some((term) => term.reference === certificate.contractReference))
+                      .map((certificate) => (
+                        <div className="cross-tax-record" key={`unmatched-${certificate.reference}`}>
+                          <div><strong>{certificate.reference}</strong><span>Contract {certificate.contractReference}</span></div>
+                          <span className="evidence-tag evidence-tag-review">No matching contract terms imported</span>
+                        </div>
+                      ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {taxpayer.profitSharingRecords.length ? (
+                <section className="cross-tax-section">
+                  <h3>Related-party profit-sharing</h3>
+                  <div className="cross-tax-records">
+                    {taxpayer.profitSharingRecords.map((record, index) => {
+                      const difference =
+                        record.allocatedAmount !== null && record.declaredAmount !== null
+                          ? record.allocatedAmount - record.declaredAmount
+                          : null
+                      return (
+                        <div className="cross-tax-record" key={`profit-${index}`}>
+                          <div>
+                            <strong>{record.relatedTin ?? "Related entity not provided"}</strong>
+                            <span>{record.period || "Period not provided"} · allocation key {record.allocationKey ?? "not provided"}</span>
+                          </div>
+                          <small>
+                            Allocated {record.allocatedAmount === null ? "not provided" : formatNumber(record.allocatedAmount)} · declared {record.declaredAmount === null ? "not provided" : formatNumber(record.declaredAmount)}
+                            {difference === null ? "" : ` · difference ${formatNumber(difference)}`}
+                          </small>
+                          <small>Functions/assets/risks reference: {record.functionsAssetsRisksReference ?? "not provided; specialist review required"}</small>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </section>
+              ) : null}
+
+              {taxpayer.payrollBenefitRecords.length ? (
+                <section className="cross-tax-section">
+                  <h3>Expatriate salary, benefits and PAYE</h3>
+                  <div className="cross-tax-records">
+                    {taxpayer.payrollBenefitRecords.map((record, index) => {
+                      const benefitTotal =
+                        record.cashAllowances !== null && record.nonCashBenefits !== null
+                          ? record.cashAllowances + record.nonCashBenefits
+                          : null
+                      const benefitsExceedSalary =
+                        benefitTotal !== null
+                        && record.salaryAmount !== null
+                        && benefitTotal > record.salaryAmount
+                      return (
+                        <div className="cross-tax-record" key={`payroll-${record.period}-${index}`}>
+                          <div>
+                            <strong>{record.period || "Period not provided"}</strong>
+                            <span>Expatriate count {record.expatriateCount}</span>
+                          </div>
+                          <small>
+                            Salary {record.salaryAmount === null ? "not provided" : formatNumber(record.salaryAmount)} · allowances {record.cashAllowances === null ? "not provided" : formatNumber(record.cashAllowances)} · non-cash benefits {record.nonCashBenefits === null ? "not provided" : formatNumber(record.nonCashBenefits)} · PAYE {record.payeDeclared === null ? "not provided" : formatNumber(record.payeDeclared)}
+                          </small>
+                          {benefitsExceedSalary ? (
+                            <span className="evidence-tag evidence-tag-review">Benefits exceed salary; verify payroll, contract and PAYE (not a statutory finding)</span>
+                          ) : null}
+                          {record.contractReference ? <small>Contract reference: {record.contractReference}</small> : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </section>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="table-empty">
+          <span className="empty-table-icon">⌕</span>
+          <strong>No cross-tax evidence rows imported</strong>
+          <span>Download the workbook template and populate the ePayments, e-Certificates, contract terms, profit sharing, WHT or payroll worksheets.</span>
+        </div>
+      )}
+      <div className="policy-footnote">All comparisons are advisory. Verify matching identifiers, periods, contract scope, tax base, timing and lawful treatment before taking action.</div>
     </section>
   )
 }

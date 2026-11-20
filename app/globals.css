@@ -257,6 +257,23 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
 .mne-review-card { display: grid; gap: 5px; padding: 10px; border: 1px solid #e7ece8; border-radius: 7px; background: #fbfcfb; color: #718079; font-size: 9px; }
 .mne-review-card strong { color: #355447; }
 .mne-review-card small { margin-top: 4px; color: #8b9a93; line-height: 1.5; }
+.cross-tax-panel { padding-bottom: 16px; }
+.cross-tax-taxpayers { display: grid; gap: 12px; padding: 0 18px; }
+.cross-tax-taxpayer { padding: 14px; border: 1px solid #e6ece8; border-radius: 8px; background: #fcfdfc; }
+.cross-tax-taxpayer > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid #edf1ee; }
+.cross-tax-taxpayer > header > div { display: grid; gap: 4px; }
+.cross-tax-taxpayer > header strong { color: #304941; font-size: 11px; }
+.cross-tax-taxpayer > header > div > span { color: #8c9a93; font-size: 9px; }
+.cross-tax-section { margin-top: 12px; }
+.cross-tax-section h3 { margin: 0 0 7px; color: #52665d; font-size: 10px; }
+.cross-tax-records { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.cross-tax-record { display: grid; align-content: start; gap: 5px; padding: 9px; border: 1px solid #edf1ee; border-radius: 6px; background: #fff; color: #77857e; font-size: 9px; line-height: 1.5; }
+.cross-tax-record > div { display: grid; gap: 2px; }
+.cross-tax-record > div strong { color: #3b574b; font-size: 9px; }
+.cross-tax-record small { color: #87958e; font-size: 8px; line-height: 1.55; }
+.evidence-tag { width: fit-content; padding: 3px 6px; border-radius: 4px; font-size: 8px; font-weight: 700; }
+.evidence-tag-review { background: #fbf2df; color: #926b2e; }
+.evidence-tag-complete { background: #e8f4ec; color: #427957; }
 .policy-footnote { margin: 0 18px 17px; color: #929e98; font-size: 9px; }
 
 .recovery-layout { display: grid; grid-template-columns: minmax(240px, .72fr) minmax(0, 1.65fr); align-items: start; gap: 14px; }
@@ -395,6 +412,9 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
   .detail-metrics { grid-template-columns: 1fr; }
   .rule-roadmap-banner { align-items: flex-start; flex-direction: column; margin-right: 12px; margin-left: 12px; }
   .mne-review-grid { grid-template-columns: 1fr; margin-right: 12px; margin-left: 12px; }
+  .cross-tax-taxpayers { padding-right: 12px; padding-left: 12px; }
+  .cross-tax-records { grid-template-columns: 1fr; }
+  .cross-tax-taxpayer > header { align-items: flex-start; flex-direction: column; }
   .scenario-cards { grid-template-columns: 1fr; }
   .scenario-card { display: block; }
   .upload-form:not(.upload-form-empty) { align-items: stretch; flex-direction: column; }
