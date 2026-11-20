@@ -134,7 +134,7 @@ export default function RiskLensDashboard() {
   const loadDashboard = useCallback(async (importId?: string): Promise<DashboardData> => {
     const query = importId ? `?importId=${encodeURIComponent(importId)}` : ""
     const response = await fetch(`/api/data/dashboard${query}`, { cache: "no-store" })
-    const payload: unknown = await response.json()
+    const payload = await readJsonResponse(response, "Unable to load dashboard data.")
     if (!response.ok) throw new Error(errorMessage(payload, "Unable to load dashboard data."))
     const next = payload as DashboardData
     setDashboard(next)
@@ -148,7 +148,7 @@ export default function RiskLensDashboard() {
         setHealth(null)
         return
       }
-      setHealth((await response.json()) as EngineHealth)
+      setHealth((await readJsonResponse(response, "Unable to load engine health.")) as EngineHealth)
     } catch {
       setHealth(null)
     }
@@ -158,12 +158,16 @@ export default function RiskLensDashboard() {
     let active = true
     Promise.all([
       fetch("/api/data/dashboard", { cache: "no-store" }).then(async (response) => {
-        const payload: unknown = await response.json()
+        const payload = await readJsonResponse(response, "Unable to load dashboard data.")
         if (!response.ok) throw new Error(errorMessage(payload, "Unable to load dashboard data."))
         return payload as DashboardData
       }),
       fetch("/api/risk/health", { cache: "no-store" })
-        .then(async (response) => (response.ok ? ((await response.json()) as EngineHealth) : null))
+        .then(async (response) =>
+          response.ok
+            ? ((await readJsonResponse(response, "Unable to load engine health.")) as EngineHealth)
+            : null,
+        )
         .catch(() => null),
     ])
       .then(([nextDashboard, engineHealth]) => {
@@ -216,7 +220,7 @@ export default function RiskLensDashboard() {
     formData.set("file", selectedFile)
     try {
       const response = await fetch("/api/data/imports", { method: "POST", body: formData })
-      const payload: unknown = await response.json()
+      const payload = await readJsonResponse(response, "Workbook import failed.")
       if (!response.ok) throw new Error(errorMessage(payload, "Workbook import failed."))
       const record = payload as { import: { id: string; taxpayerCount: number; recordCount: number } }
       const next = await loadDashboard(record.import.id)
@@ -262,8 +266,8 @@ export default function RiskLensDashboard() {
           body: JSON.stringify({ tin }),
         },
       )
-      const payload: unknown = await response.json()
-      if (!response.ok) throw new Error(errorMessage(payload, "Risk scoring failed."))
+      const parsedPayload = await readJsonResponse(response, "Risk scoring failed.")
+      if (!response.ok) throw new Error(errorMessage(parsedPayload, "Risk scoring failed."))
       const next = await loadDashboard(dashboard.activeImportId)
       setCaseCountOverride(next.summary.highPriority)
       setNotice(`R1–R5 screening completed for ${tin}. Review its evidence before taking action.`)
@@ -303,7 +307,7 @@ export default function RiskLensDashboard() {
         decisionReason,
       }),
     })
-    const payload: unknown = await response.json()
+    const payload = await readJsonResponse(response, "Unable to save case review.")
     if (!response.ok) throw new Error(errorMessage(payload, "Unable to save case review."))
     await loadDashboard(dashboard.activeImportId)
     setNotice("Case review saved locally.")
@@ -399,11 +403,6 @@ export default function RiskLensDashboard() {
               {health?.ok ? "Risk engine connected" : "Risk engine offline"}
             </div>
           </section>
-
-          <div className="prototype-notice">
-            <span className="notice-icon">i</span>
-            <p><strong>Proposal prototype.</strong> Use synthetic or approved masked data only. Risk flags are audit leads, not proof of wrongdoing. No automated refund, assessment or enforcement decision is made.</p>
-          </div>
 
           {pageError ? (
             <div className="alert alert-error" role="alert">
