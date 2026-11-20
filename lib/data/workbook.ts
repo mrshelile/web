@@ -205,6 +205,11 @@ function normalizeFieldValue(
     if (!Number.isFinite(numeric)) {
       throw new WorkbookValidationError(`${sheet} row ${rowNumber}: "${field}" must contain a number.`)
     }
+    if (field === "extraction_confidence" && (numeric < 0 || numeric > 1)) {
+      throw new WorkbookValidationError(
+        `${sheet} row ${rowNumber}: "extraction_confidence" must be between 0 and 1.`,
+      )
+    }
     return numeric
   }
 

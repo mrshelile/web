@@ -40,7 +40,7 @@ Engine URL and optional service authentication are server-side deployment settin
 
 The current build is a local, single-user MVP to demonstrate the proposal, not a production RSL system:
 
-- One officer dashboard with overview, audit worklist, VAT refund review, MNE data view, recovery scenarios and workbook-import history.
+- One officer dashboard with overview, audit worklist, VAT refund review, MNE data view, cross-tax evidence review, recovery scenarios and workbook-import history.
 - Excel `.xlsx` template and upload, server-side validation, row/source counts and local SQLite persistence.
 - Server-side Next.js API sends supported taxpayer profiles to the separate Python R1–R5 scoring service.
 - Officers can review returned evidence and save an MVP case status/note in SQLite.
