@@ -75,7 +75,7 @@ function createDatabase(): DatabaseSync {
     );
     CREATE TABLE IF NOT EXISTS case_audit_events (
       id INTEGER PRIMARY KEY,
-      import_id TEXT NOT NOT NULL REFERENCES imports(id) ON DELETE CASCADE,
+      import_id TEXT NOT NULL REFERENCES imports(id) ON DELETE CASCADE,
       tin TEXT NOT NULL,
       action TEXT NOT NULL CHECK(action IN ('created', 'updated')),
       status TEXT NOT NULL CHECK(status IN ('New', 'Reviewing', 'Request information', 'Referred', 'Closed')),
