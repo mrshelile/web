@@ -40,8 +40,13 @@ async function requestJson(path: "/health" | "/score", init: RequestInit, timeou
     }
 
     try {
-      return await response.json()
-    } catch {
+      const text = await response.text()
+      if (!text.trim()) {
+        throw new RiskEngineError("ENGINE_INVALID_RESPONSE", "Risk engine returned an empty response", response.status)
+      }
+      return JSON.parse(text) as unknown
+    } catch (error) {
+      if (error instanceof RiskEngineError) throw error
       throw new RiskEngineError("ENGINE_INVALID_RESPONSE", "Risk engine returned invalid JSON", response.status)
     }
   } catch (error) {

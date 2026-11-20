@@ -72,6 +72,26 @@ function errorMessage(payload: unknown, fallback: string): string {
   return fallback
 }
 
+async function readJsonResponse(response: Response, fallback: string): Promise<unknown> {
+  const text = await response.text()
+  if (!text.trim()) {
+    throw new Error(
+      response.ok
+        ? fallback
+        : `Request failed with HTTP ${response.status} and an empty response.`,
+    )
+  }
+  try {
+    return JSON.parse(text) as unknown
+  } catch {
+    throw new Error(
+      response.ok
+        ? fallback
+        : `Request failed with HTTP ${response.status}; the response was not valid JSON.`,
+    )
+  }
+}
+
 function riskClass(priority: string): string {
   if (priority === "High priority") return "priority-high"
   if (priority === "Needs review") return "priority-review"
