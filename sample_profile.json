@@ -38,7 +38,8 @@
       "declared_turnover": 150000
     }
   ],
-  "lekuka_invoices": [
+  "lekuka_source_available": true,
+  "lekuka_purchase_invoices": [
     {
       "invoice_id": "I1",
       "supplier_tin": "X",
@@ -52,12 +53,12 @@
       "matched": false
     }
   ],
-  "bank_transactions": [
+  "merchant_statements": [
     {
-      "credit": 1500000
+      "amount": 1500000
     }
   ],
-  "credit_notes": [
+  "lekuka_credit_notes": [
     {
       "note_id": "C1",
       "amount": 90000

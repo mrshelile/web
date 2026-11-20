@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
-export async function GET() {
-  const base = process.env.RISK_ENGINE_URL ?? "http://localhost:8000";
+import { checkEngineHealth } from "@/lib/risk-engine/client"
+import { RiskEngineError, publicEngineError } from "@/lib/risk-engine/errors"
+
+export async function GET(): Promise<NextResponse> {
   try {
-    const r = await fetch(`${base}/health`, { cache: "no-store" });
-    return NextResponse.json(await r.json());
-  } catch {
-    return NextResponse.json({ ok: false }, { status: 502 });
+    return NextResponse.json(await checkEngineHealth())
+  } catch (error) {
+    if (error instanceof RiskEngineError) {
+      const result = publicEngineError(error)
+      return NextResponse.json(result.body, { status: result.status })
+    }
+    throw error
   }
 }
