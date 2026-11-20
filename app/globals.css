@@ -238,6 +238,10 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
 .case-audit-history li span { color: #98a59f; font-size: 8px; }
 .refund-context { display: flex; gap: 9px; margin: 0 18px 17px; padding: 9px 11px; border-radius: 6px; background: #f8f5e9; color: #7e7049; font-size: 9px; line-height: 1.55; }
 .refund-context strong { white-space: nowrap; }
+.refund-context { align-items: flex-start; flex-wrap: wrap; }
+.refund-checklist { display: grid; flex: 1 1 420px; gap: 3px; padding-left: 10px; border-left: 1px solid #ddd3ad; }
+.refund-checklist b { color: #6e623f; }
+.refund-checklist small { color: #9a663d; }
 .source-chip { padding: 5px 7px; border-radius: 5px; background: #edf5f0; color: #4e8066; font-size: 8px; font-weight: 700; }
 .amount-cell { color: #3f6957; font-size: 10px; }
 .table-search { display: flex; align-items: center; gap: 7px; min-width: 190px; padding: 8px 9px; border: 1px solid #e5ebe7; border-radius: 7px; background: #fff; color: #8b9b93; }
@@ -253,6 +257,10 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
 .rule-roadmap-banner { display: flex; align-items: baseline; gap: 10px; margin: 17px 18px; padding: 12px 14px; border: 1px solid #e6dfc9; border-radius: 7px; background: #fcf9f0; color: #7e7252; font-size: 9px; line-height: 1.55; }
 .rule-roadmap-banner strong { flex: 0 0 auto; color: #7d693b; }
 .mne-table td { white-space: nowrap; }
+.mne-review-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 18px 16px; }
+.mne-review-card { display: grid; gap: 5px; padding: 10px; border: 1px solid #e7ece8; border-radius: 7px; background: #fbfcfb; color: #718079; font-size: 9px; }
+.mne-review-card strong { color: #355447; }
+.mne-review-card small { margin-top: 4px; color: #8b9a93; line-height: 1.5; }
 .policy-footnote { margin: 0 18px 17px; color: #929e98; font-size: 9px; }
 
 .recovery-layout { display: grid; grid-template-columns: minmax(240px, .72fr) minmax(0, 1.65fr); align-items: start; gap: 14px; }
@@ -391,6 +399,7 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
   .priority-pill { display: none; }
   .detail-metrics { grid-template-columns: 1fr; }
   .rule-roadmap-banner { align-items: flex-start; flex-direction: column; margin-right: 12px; margin-left: 12px; }
+  .mne-review-grid { grid-template-columns: 1fr; margin-right: 12px; margin-left: 12px; }
   .scenario-cards { grid-template-columns: 1fr; }
   .scenario-card { display: block; }
   .upload-form:not(.upload-form-empty) { align-items: stretch; flex-direction: column; }

@@ -462,6 +462,7 @@ export function getDashboard(importId?: string | null): DashboardData | null {
 
   const taxpayers = new Map<string, TaxpayerDashboardRow>()
   const sourceCounts: Record<string, number> = {}
+  const duplicateInvoiceKeys = new Map<string, Set<string>>()
   for (const row of sourceRows) {
     sourceCounts[row.sheet_key] = (sourceCounts[row.sheet_key] ?? 0) + 1
     if (!row.tin) continue
@@ -479,9 +480,20 @@ export function getDashboard(importId?: string | null): DashboardData | null {
         taxableIncome: 0,
         refundClaimed: 0,
         relatedPartyCharges: 0,
+        managementFees: 0,
+        royalties: 0,
+        relatedPartyInterest: 0,
+        lowTaxJurisdictionPayments: 0,
         foreignPayments: 0,
         importedServicesVatDeclared: 0,
         grossMarginPct: 0,
+        payrollAmount: 0,
+        expatriateCount: 0,
+        payeDeclared: 0,
+        consultantPayments: 0,
+        negativeVatPeriods: 0,
+        duplicateInvoiceCount: 0,
+        quarantinedInvoiceCount: 0,
         sourceCounts: {},
         score: savedScore?.score ?? null,
         scoreStatus:
@@ -515,12 +527,36 @@ export function getDashboard(importId?: string | null): DashboardData | null {
       taxpayer.taxableIncome = asNumber(data.taxable_income, "taxable_income")
       taxpayer.refundClaimed = asNumber(data.refund_claimed, "refund_claimed")
       taxpayer.relatedPartyCharges = asNumber(data.related_party_charges, "related_party_charges")
+      taxpayer.managementFees = asNumber(data.management_fees, "management_fees")
+      taxpayer.royalties = asNumber(data.royalties, "royalties")
+      taxpayer.relatedPartyInterest = asNumber(data.related_party_interest, "related_party_interest")
+      taxpayer.lowTaxJurisdictionPayments = asNumber(
+        data.low_tax_jurisdiction_payments,
+        "low_tax_jurisdiction_payments",
+      )
       taxpayer.foreignPayments = asNumber(data.foreign_payments, "foreign_payments")
       taxpayer.importedServicesVatDeclared = asNumber(
         data.imported_services_vat_declared,
         "imported_services_vat_declared",
       )
       taxpayer.grossMarginPct = asNumber(data.gross_margin_pct, "gross_margin_pct")
+      taxpayer.payrollAmount = asNumber(data.payroll_amount, "payroll_amount")
+    }
+    if (row.sheet_key === "vat_returns" && asNumber(data.net_vat, "net_vat") < 0) {
+      taxpayer.negativeVatPeriods += 1
+    }
+    if (row.sheet_key === "purchase_invoices") {
+      if (asBoolean(data.quarantined, "quarantined")) taxpayer.quarantinedInvoiceCount += 1
+      const invoiceId = nullableText(data.invoice_id)
+      const supplierTin = nullableText(data.supplier_tin)
+      const invoiceVat = asNumber(data.vat_amount, "vat_amount")
+      if (row.tin && invoiceId) {
+        const duplicateKey = `${invoiceId}|${supplierTin ?? ""}|${invoiceVat}`
+        const seen = duplicateInvoiceKeys.get(row.tin) ?? new Set<string>()
+        if (seen.has(duplicateKey)) taxpayer.duplicateInvoiceCount += 1
+        seen.add(duplicateKey)
+        duplicateInvoiceKeys.set(row.tin, seen)
+      }
     }
     if (row.sheet_key === "foreign_services") {
       taxpayer.foreignPayments += asNumber(data.amount, "foreign service amount")
@@ -528,9 +564,15 @@ export function getDashboard(importId?: string | null): DashboardData | null {
         data.imported_services_vat_declared,
         "imported_services_vat_declared",
       )
+      taxpayer.consultantPayments += asNumber(data.amount, "foreign service amount")
     }
     if (row.sheet_key === "related_parties") {
       taxpayer.relatedPartyCharges += asNumber(data.related_party_charges ?? data.amount, "related party charges")
+    }
+    if (row.sheet_key === "payroll") {
+      taxpayer.payrollAmount += asNumber(data.payroll_amount, "payroll_amount")
+      taxpayer.expatriateCount += asNumber(data.expatriate_count, "expatriate_count")
+      taxpayer.payeDeclared += asNumber(data.paye_declared, "paye_declared")
     }
   }
 

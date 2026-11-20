@@ -169,7 +169,17 @@ export default function RiskLensDashboard() {
     const term = search.trim().toLowerCase()
     return taxpayers.filter((taxpayer) => {
       if (tab === "refunds" && taxpayer.refundClaimed <= 0) return false
-      if (tab === "mne" && taxpayer.relatedPartyCharges <= 0 && taxpayer.foreignPayments <= 0) return false
+      if (
+        tab === "mne"
+        && taxpayer.relatedPartyCharges <= 0
+        && taxpayer.foreignPayments <= 0
+        && taxpayer.managementFees <= 0
+        && taxpayer.royalties <= 0
+        && taxpayer.relatedPartyInterest <= 0
+        && taxpayer.lowTaxJurisdictionPayments <= 0
+        && taxpayer.importedServicesVatDeclared <= 0
+        && taxpayer.payrollAmount <= 0
+      ) return false
       if (tab === "worklist" && taxpayer.scoreStatus === "not_evaluable") return false
       return !term || taxpayer.name.toLowerCase().includes(term) || taxpayer.tin.toLowerCase().includes(term)
     })
@@ -803,7 +813,9 @@ function TableRows({
         </td>
         <td>
           {mode === "refunds" ? (
-            <span className="source-chip">{taxpayer.sourceCounts.vat_returns ?? 0} VAT rows</span>
+            <span className="source-chip">
+              {taxpayer.sourceCounts.vat_returns ?? 0} VAT rows · {taxpayer.duplicateInvoiceCount} duplicate{taxpayer.duplicateInvoiceCount === 1 ? "" : "s"}
+            </span>
           ) : score ? (
             <span className="confidence-cell">
               <span className="confidence-track"><i style={{ width: `${Math.round(score.data_confidence * 100)}%` }} /></span>
@@ -882,6 +894,13 @@ function TableRows({
               <div className="refund-context">
                 <strong>Fairness reminder</strong>
                 <span>Refund history alone is not adverse. Verify exports, investment, timing, invoices and taxpayer explanations using authorized source evidence.</span>
+                <div className="refund-checklist">
+                  <b>Verification checklist</b>
+                  <span>VAT period and return · invoice validity and duplicates · supplier status · purchases vs. sales and stock · import/export evidence · taxpayer explanation</span>
+                  {taxpayer.quarantinedInvoiceCount > 0 ? (
+                    <small>{taxpayer.quarantinedInvoiceCount} purchase-invoice row(s) quarantined for validation or TIN matching.</small>
+                  ) : null}
+                </div>
               </div>
             ) : null}
             {compact ? <span className="sr-only">Compact worklist preview</span> : null}
@@ -987,7 +1006,16 @@ function MneScreen({
   search: string
   onSearch: (value: string) => void
 }) {
-  const mneTaxpayers = taxpayers.filter((taxpayer) => taxpayer.relatedPartyCharges > 0 || taxpayer.foreignPayments > 0)
+  const mneTaxpayers = taxpayers.filter((taxpayer) =>
+    taxpayer.relatedPartyCharges > 0
+    || taxpayer.foreignPayments > 0
+    || taxpayer.managementFees > 0
+    || taxpayer.royalties > 0
+    || taxpayer.relatedPartyInterest > 0
+    || taxpayer.lowTaxJurisdictionPayments > 0
+    || taxpayer.importedServicesVatDeclared > 0
+    || taxpayer.payrollAmount > 0
+  )
   return (
     <section className="panel data-panel">
       <div className="panel-heading panel-heading-wrap">
@@ -1005,16 +1033,17 @@ function MneScreen({
       {mneTaxpayers.length ? (
         <div className="table-scroll">
           <table className="taxpayer-table mne-table">
-          <thead><tr><th>Taxpayer</th><th>Revenue</th><th>Related-party charges</th><th>RP charge / revenue</th><th>Foreign payments</th><th>Gross margin</th><th>Imported-services VAT</th></tr></thead>
+          <thead><tr><th>Taxpayer</th><th>Revenue</th><th>RP charges</th><th>RP / revenue</th><th>Fees / royalties / interest</th><th>Low-tax payments</th><th>Margin</th><th>Negative VAT periods</th></tr></thead>
             <tbody>{mneTaxpayers.map((taxpayer) => (
               <tr key={taxpayer.tin}>
                 <td><div className="taxpayer-cell static"><span className="company-avatar">{taxpayer.name.slice(0, 1).toUpperCase()}</span><span><strong>{taxpayer.name}</strong><small>{taxpayer.tin}{taxpayer.sector ? ` · ${taxpayer.sector}` : ""}</small></span></div></td>
                 <td>{formatNumber(taxpayer.revenue)}</td>
                 <td>{formatNumber(taxpayer.relatedPartyCharges)}</td>
               <td>{taxpayer.revenue > 0 ? `${((taxpayer.relatedPartyCharges / taxpayer.revenue) * 100).toFixed(1)}%` : "Not evaluable"}</td>
-                <td>{formatNumber(taxpayer.foreignPayments)}</td>
+                <td>{formatNumber(taxpayer.managementFees)} / {formatNumber(taxpayer.royalties)} / {formatNumber(taxpayer.relatedPartyInterest)}</td>
+                <td>{formatNumber(taxpayer.lowTaxJurisdictionPayments)}</td>
                 <td>{taxpayer.grossMarginPct ? `${taxpayer.grossMarginPct}%` : "—"}</td>
-                <td>{formatNumber(taxpayer.importedServicesVatDeclared)}</td>
+                <td>{taxpayer.negativeVatPeriods}</td>
               </tr>
             ))}</tbody>
           </table>
@@ -1022,6 +1051,19 @@ function MneScreen({
       ) : (
         <div className="table-empty"><span className="empty-table-icon">⌕</span><strong>No MNE indicator data imported</strong><span>Use the Taxpayers worksheet columns for related-party charges, foreign payments and gross margin.</span></div>
       )}
+      {mneTaxpayers.length ? (
+        <div className="mne-review-grid">
+          {mneTaxpayers.map((taxpayer) => (
+            <article className="mne-review-card" key={`context-${taxpayer.tin}`}>
+              <strong>{taxpayer.name}</strong>
+              <span>Foreign payments: {formatNumber(taxpayer.foreignPayments)}</span>
+              <span>Imported-services VAT declared: {formatNumber(taxpayer.importedServicesVatDeclared)}</span>
+              <span>PAYE declared: {formatNumber(taxpayer.payeDeclared)} · Expatriates: {taxpayer.expatriateCount}</span>
+              <small>Verify service nature, place of supply, consulting duties, control, payroll and PAYE treatment. No classification is automated.</small>
+            </article>
+          ))}
+        </div>
+      ) : null}
       <div className="policy-footnote">International transactions, losses and recurring refunds are not inherently abusive. Officer review and source evidence are required.</div>
     </section>
   )

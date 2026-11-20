@@ -48,9 +48,20 @@ export type TaxpayerDashboardRow = {
   taxableIncome: number
   refundClaimed: number
   relatedPartyCharges: number
+  managementFees: number
+  royalties: number
+  relatedPartyInterest: number
+  lowTaxJurisdictionPayments: number
   foreignPayments: number
   importedServicesVatDeclared: number
   grossMarginPct: number
+  payrollAmount: number
+  expatriateCount: number
+  payeDeclared: number
+  consultantPayments: number
+  negativeVatPeriods: number
+  duplicateInvoiceCount: number
+  quarantinedInvoiceCount: number
   sourceCounts: Record<string, number>
   score: ScoreResult | null
   scoreStatus: "unscored" | "scored" | "error" | "not_evaluable"
